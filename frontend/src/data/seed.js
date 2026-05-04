@@ -15,7 +15,7 @@ export const seed = {
     { id: 3, name: 'Rahul Nair', dob: '2005-05-20', role: 'student', email: 'rahul@kfa.test', phone: '9000000003' },
   ],
   staff: [{ id: 1, user_id: 2, name: 'Ananya Rao', specialization: 'Vocals and Keyboard', salary: 42000, branch_id: 1, branch_name: 'KFA Madambakkam Branch' }],
-  students: [{ id: 1, user_id: 3, name: 'Rahul Nair', admission_date: '2026-04-01', parent_name: 'Meera Nair', branch_id: 1, branch_name: 'KFA Madambakkam Branch' }],
+  students: [{ id: 1, user_id: 3, name: 'Rahul Nair', admission_date: '2026-04-01', parent_name: 'Meera Nair', branch_id: 1, branch_name: 'KFA Madambakkam Branch', account_status: 'active' }],
   classes: [
     { id: 1, course_id: 1, course_name: 'Carnatic Vocals', staff_id: 1, staff_name: 'Ananya Rao', branch_id: 1, branch_name: 'KFA Madambakkam Branch', day_of_week: 'Monday', start_time: '17:00', end_time: '18:00' },
     { id: 2, course_id: 2, course_name: 'Keyboard and Piano', staff_id: 1, staff_name: 'Ananya Rao', branch_id: 1, branch_name: 'KFA Madambakkam Branch', day_of_week: 'Wednesday', start_time: '18:00', end_time: '19:00' },
@@ -25,7 +25,7 @@ export const seed = {
     { id: 1, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-22', status: 'present' },
     { id: 2, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-24', status: 'absent' },
   ],
-  fees: [{ id: 1, student_id: 1, student_name: 'Rahul Nair', branch_id: 1, branch_name: 'KFA Madambakkam Branch', fee_type: 'course', course_id: 1, course_name: 'Carnatic Vocals', total_amount: 18000, paid_amount: 0, due_amount: 18000, status: 'pending' }],
+  fees: [{ id: 1, student_id: 1, student_name: 'Rahul Nair', branch_id: 1, branch_name: 'KFA Madambakkam Branch', fee_type: 'course', course_id: 1, course_name: 'Carnatic Vocals', total_amount: 18000, paid_amount: 0, due_amount: 18000, fee_frequency: 'monthly', billing_day: 1, due_day: 10, status: 'pending' }],
   payments: [],
   enquiries: [],
   notifications: [

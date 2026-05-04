@@ -50,6 +50,7 @@ CREATE TABLE students (
     admission_date DATE,
     parent_name VARCHAR(100),
     photo_url VARCHAR(500),
+    account_status VARCHAR(20) DEFAULT 'active',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -162,6 +163,9 @@ CREATE TABLE fees (
     amount DECIMAL(10,2),
     payment_date DATE,
     status ENUM('paid', 'pending'),
+    fee_frequency VARCHAR(20) DEFAULT 'monthly',
+    billing_day INT,
+    due_day INT,
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 );
 

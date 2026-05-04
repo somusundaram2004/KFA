@@ -3,23 +3,48 @@ import DashboardFrame from '../../components/DashboardFrame'
 import DataSection from '../../components/DataSection'
 import StatGrid from '../../components/StatGrid'
 
-export default function StaffDashboard({ data, session, markAttendance, addRecord }) {
-  const staff = data.staff.find((item) => Number(item.user_id) === Number(session.id)) || data.staff.find((item) => item.name === session.name) || data.staff[0]
-  const classes = data.classes.filter((item) => Number(item.staff_id) === Number(staff?.id) || item.staff_name === staff?.name)
+function formatTime(timeValue) {
+  if (!timeValue) return ''
+  const [hour, minute] = String(timeValue).split(':')
+  const date = new Date()
+  date.setHours(Number(hour || 0), Number(minute || 0), 0, 0)
+  return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+}
+
+function todayValue() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export default function StaffDashboard({ data, session, markAttendance, addRecord, updateRecord }) {
+  const staff = (data.staff || []).find((item) => Number(item.user_id) === Number(session.id)) || (data.staff || []).find((item) => item.name === session.name) || (data.staff || [])[0]
+  const classes = (data.classes || []).filter((item) => Number(item.staff_id) === Number(staff?.id) || item.staff_name === staff?.name)
   const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '')
-  const [attendanceForm, setAttendanceForm] = useState({ student_id: '', status: 'present' })
-  const today = new Date().toISOString().slice(0, 10)
+  const [attendanceDate, setAttendanceDate] = useState(todayValue())
   const selectedClass = classes.find((item) => String(item.id) === String(selectedClassId))
-  const classAttendance = data.attendance.filter((item) => String(item.class_id) === String(selectedClassId))
+  const selectedDay = selectedClass?.day_of_week || 'Class Day'
+  const classAttendance = (data.attendance || []).filter((item) => String(item.class_id) === String(selectedClassId))
+  const todaysAttendance = classAttendance.filter((item) => item.date === attendanceDate)
+  const enrolledStudentIds = (data.enrollments || []).filter((item) => Number(item.course_id) === Number(selectedClass?.course_id)).map((item) => Number(item.student_id))
+  const roster = (data.students || []).filter((student) => enrolledStudentIds.length ? enrolledStudentIds.includes(Number(student.id)) : Number(student.branch_id || selectedClass?.branch_id) === Number(selectedClass?.branch_id || student.branch_id))
+  const presentCount = todaysAttendance.filter((item) => item.status === 'present').length
   const eventPrograms = data.event_programs || []
   const eventTeams = data.event_program_teams || []
   const eventParticipants = data.event_program_participants || []
   const eventItems = (data.event_program_items || []).filter((item) => eventPrograms.some((program) => Number(program.id) === Number(item.event_program_id)))
+  const notifications = data.notifications || []
 
-  function submitAttendance(event) {
-    event.preventDefault()
-    markAttendance({ ...attendanceForm, class_id: selectedClassId, date: today })
-    setAttendanceForm({ student_id: '', status: 'present' })
+  function attendanceFor(studentId) {
+    return todaysAttendance.find((item) => Number(item.student_id) === Number(studentId))
+  }
+
+  function setAttendance(studentId, status) {
+    const existing = attendanceFor(studentId)
+    const record = { student_id: studentId, class_id: selectedClassId, date: attendanceDate, status }
+    if (existing) {
+      updateRecord('attendance', existing.id, record)
+      return
+    }
+    markAttendance(record)
   }
 
   return (
@@ -31,35 +56,54 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
           <p>Manage today&apos;s classes, mark attendance, and send updates to students from one clean screen.</p>
         </div>
       </section>
-      <StatGrid stats={[['Assigned Classes', classes.length], ['Event Programs', eventPrograms.length], ['Program Students', eventParticipants.length], ['Notifications', data.notifications.length]]} />
-      <div className="class-card-grid">
+      <StatGrid stats={[['Assigned Classes', classes.length], ['Marked Present', `${presentCount}/${roster.length}`], ['Event Programs', eventPrograms.length], ['Notifications', notifications.length]]} />
+      <div className="class-card-grid day-card-grid">
         {classes.map((item) => (
-          <button key={item.id} type="button" className={String(selectedClassId) === String(item.id) ? 'class-card active' : 'class-card'} onClick={() => setSelectedClassId(item.id)}>
+          <button key={item.id} type="button" className={String(selectedClassId) === String(item.id) ? 'class-card day-card active' : 'class-card day-card'} onClick={() => setSelectedClassId(item.id)}>
+            <span>{item.day_of_week || 'Class Day'}</span>
             <strong>{item.course_name}</strong>
             <span>{item.branch_name || 'KFA Branch'}</span>
-            <small>{item.day_of_week} {item.start_time} - {item.end_time}</small>
+            <small>{formatTime(item.start_time)} - {formatTime(item.end_time)}</small>
           </button>
         ))}
       </div>
       <div className="dashboard-grid">
-        <form className="panel form-grid" onSubmit={submitAttendance}>
-          <h3>{selectedClass ? `Today: ${selectedClass.course_name}` : 'Today Attendance'}</h3>
-          <label className="field-control">
-            <span>Student</span>
-            <select required value={attendanceForm.student_id} onChange={(event) => setAttendanceForm({ ...attendanceForm, student_id: event.target.value })}>
-              <option value="">Select student</option>
-              {data.students.map((student) => <option key={student.id} value={student.id}>{student.name}</option>)}
-            </select>
-          </label>
-          <label className="field-control">
-            <span>Status</span>
-            <select value={attendanceForm.status} onChange={(event) => setAttendanceForm({ ...attendanceForm, status: event.target.value })}>
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-            </select>
-          </label>
-          <button className="primary">Mark Attendance</button>
-        </form>
+        <section className="panel attendance-roster-panel">
+          <div className="form-title-row">
+            <div>
+              <h3>{selectedClass ? `${selectedDay}: ${selectedClass.course_name}` : 'Attendance'}</h3>
+              <p className="hint">{selectedClass ? `${selectedClass.branch_name || 'KFA Branch'} | ${formatTime(selectedClass.start_time)} - ${formatTime(selectedClass.end_time)}` : 'Choose a day card to view students.'}</p>
+            </div>
+            <label className="field-control compact-control">
+              <span>Date</span>
+              <input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} />
+            </label>
+          </div>
+          {!selectedClass ? (
+            <p className="empty">No assigned classes yet.</p>
+          ) : !roster.length ? (
+            <p className="empty">No students found for this class yet.</p>
+          ) : (
+            <div className="attendance-roster">
+              {roster.map((student) => {
+                const marked = attendanceFor(student.id)
+                const isPresent = marked?.status === 'present'
+                return (
+                  <article className={isPresent ? 'attendance-student present' : 'attendance-student'} key={student.id}>
+                    <div>
+                      <strong>{student.name}</strong>
+                      <span>{student.phone || student.email || 'Student'}</span>
+                    </div>
+                    <button type="button" className={isPresent ? 'present-toggle is-on' : 'present-toggle'} onClick={() => setAttendance(student.id, isPresent ? 'absent' : 'present')} aria-pressed={isPresent}>
+                      <span></span>
+                      {isPresent ? 'Present' : 'Absent'}
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
         <form className="panel form-grid" onSubmit={(event) => {
           event.preventDefault()
           const form = new FormData(event.currentTarget)

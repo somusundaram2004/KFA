@@ -316,7 +316,7 @@ function AttendanceView({ data }) {
   )
 }
 
-function FeesView({ data, optionSets }) {
+function FeesView({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
   const [filters, setFilters] = useState({ branch_id: '', student_id: '', status: '', fee_type: '' })
   const rows = data.fees.filter((fee) => Object.entries(filters).every(([key, value]) => !value || String(fee[key] ?? '') === String(value)))
   const paidCount = rows.filter((fee) => fee.status === 'paid').length
@@ -330,48 +330,65 @@ function FeesView({ data, optionSets }) {
     })
 
   return (
-    <section className="table-section">
-      <div className="fee-summary">
-        <article><strong>{paidCount}</strong><span>Paid</span></article>
-        <article><strong>{unpaidCount}</strong><span>Not Paid / Partial</span></article>
-      </div>
-      <div className="filter-bar">
-        {[
+    <>
+      <ManagedSection
+        type="fees"
+        title="Add Fee"
+        fields={[
+          { name: 'student_id', label: 'Student', type: 'select', options: optionSets.students },
+          { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches, required: false },
+          { name: 'fee_type', label: 'Fee Type', type: 'select', options: optionSets.feeTypes },
+          { name: 'course_id', label: 'Course', type: 'select', options: optionSets.courses, required: false },
+          { name: 'program_id', label: 'Program', type: 'select', options: optionSets.programs, required: false },
+          { name: 'grade_id', label: 'Grade', type: 'select', options: optionSets.grades, required: false },
+          { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
+          { name: 'total_amount', label: 'Total Amount', type: 'number' },
+          { name: 'paid_amount', label: 'Paid Amount', type: 'number', required: false },
+          { name: 'due_amount', label: 'Due Amount', type: 'number', required: false },
+          { name: 'fee_frequency', label: 'Frequency', type: 'select', options: optionSets.feeFrequencies, required: false },
+          { name: 'billing_day', label: 'Monthly Fee Show Day', type: 'number', required: false },
+          { name: 'due_day', label: 'Monthly Due Day', type: 'number', required: false },
+          { name: 'status', label: 'Status', type: 'select', options: optionSets.feeStatuses, required: false },
+        ]}
+        rows={data.fees}
+        columns={['student_name', 'branch_name', 'fee_type', 'total_amount', 'paid_amount', 'due_amount', 'fee_frequency', 'billing_day', 'due_day', 'status']}
+        filters={[
           { name: 'branch_id', label: 'Branch', options: optionSets.branches },
           { name: 'student_id', label: 'Student', options: optionSets.students },
           { name: 'fee_type', label: 'Fee Type', options: optionSets.feeTypes },
           { name: 'status', label: 'Status', options: optionSets.feeStatuses },
-        ].map((filter) => (
-          <label className="field-control" key={filter.name}>
-            <span>{filter.label}</span>
-            <select value={filters[filter.name]} onChange={(event) => setFilters({ ...filters, [filter.name]: event.target.value })}>
-              <option value="">All</option>
-              {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-        ))}
-      </div>
-      <DataSection compact title="Student Fee Details" rows={rows} columns={['student_name', 'branch_name', 'fee_type', 'course_name', 'program_name', 'grade_name', 'university_program_name', 'total_amount', 'paid_amount', 'due_amount', 'status']} />
-      {!!receiptRows.length && (
-        <div className="receipt-admin-panel">
-          <h3>Receipt Actions</h3>
-          <div className="receipt-grid">
-            {receiptRows.map((receipt) => (
-              <article className="receipt-card" key={receipt.receiptNo}>
-                <span>{receipt.studentName}</span>
-                <strong>{receipt.receiptNo}</strong>
-                <p>{receipt.item} - Paid Rs. {Number(receipt.paidAmount || 0).toLocaleString('en-IN')}</p>
-                <div className="row-actions">
-                  <button type="button" onClick={() => openReceipt(receipt)}>View</button>
-                  <button type="button" onClick={() => downloadReceipt(receipt)}>Download</button>
-                  <a className="button-link" href={whatsappReceiptUrl(receipt)} target="_blank" rel="noreferrer">WhatsApp</a>
-                </div>
-              </article>
-            ))}
-          </div>
+        ]}
+        addRecord={addRecord}
+        updateRecord={updateRecord}
+        deleteRecord={deleteRecord}
+      />
+      <section className="table-section">
+        <div className="fee-summary">
+          <article><strong>{paidCount}</strong><span>Paid</span></article>
+          <article><strong>{unpaidCount}</strong><span>Not Paid / Partial</span></article>
         </div>
-      )}
-    </section>
+        <DataSection compact title="Student Fee Details" rows={rows} columns={['student_name', 'branch_name', 'fee_type', 'course_name', 'program_name', 'grade_name', 'university_program_name', 'total_amount', 'paid_amount', 'due_amount', 'fee_frequency', 'billing_day', 'due_day', 'status']} />
+        {!!receiptRows.length && (
+          <div className="receipt-admin-panel">
+            <h3>Receipt Actions</h3>
+            <div className="receipt-grid">
+              {receiptRows.map((receipt) => (
+                <article className="receipt-card" key={receipt.receiptNo}>
+                  <span>{receipt.studentName}</span>
+                  <strong>{receipt.receiptNo}</strong>
+                  <p>{receipt.item} - Paid Rs. {Number(receipt.paidAmount || 0).toLocaleString('en-IN')}</p>
+                  <div className="row-actions">
+                    <button type="button" onClick={() => openReceipt(receipt)}>View</button>
+                    <button type="button" onClick={() => downloadReceipt(receipt)}>Download</button>
+                    <a className="button-link" href={whatsappReceiptUrl(receipt)} target="_blank" rel="noreferrer">WhatsApp</a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </>
   )
 }
 
@@ -619,9 +636,11 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     participationStatuses: ['selected', 'confirmed', 'practice', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
     resultStatuses: ['pass', 'fail'].map((status) => ({ value: status, label: status })),
     attendanceStatuses: ['present', 'absent'].map((status) => ({ value: status, label: status })),
-    feeTypes: ['course', 'program', 'grade', 'university'].map((type) => ({ value: type, label: type })),
+    feeTypes: ['course', 'program', 'grade', 'university', 'monthly'].map((type) => ({ value: type, label: type })),
+    feeFrequencies: ['monthly', 'one-time'].map((type) => ({ value: type, label: type })),
     chargeTypes: ['program fee', 'vehicle charge', 'costume charge', 'food charge', 'specific charge', 'other'].map((type) => ({ value: type, label: type })),
     feeStatuses: ['pending', 'partial', 'paid'].map((status) => ({ value: status, label: status })),
+    studentAccountStatuses: ['pending', 'active', 'inactive'].map((status) => ({ value: status, label: status })),
   }
 
   const adminPages = useMemo(() => [
@@ -737,6 +756,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 { name: 'admission_date', label: 'Admission Date', type: 'date' },
                 { name: 'parent_name', label: 'Parent Name' },
                 { name: 'photo_url', label: 'Student Photo', type: 'file', uploadPath: '/uploads/student-photos', required: false },
+                { name: 'account_status', label: 'Login Access', type: 'select', options: optionSets.studentAccountStatuses, required: false },
                 { name: 'program_id', label: 'Non-Exam Program', type: 'select', options: optionSets.programs, required: false },
                 { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades, required: false },
                 { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
@@ -744,8 +764,8 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 { name: 'status', label: 'Academic Status', type: 'select', options: optionSets.statuses, required: false },
               ]}
               rows={data.students}
-              columns={['name', 'branch_name', 'dob', 'email', 'phone', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
-              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }]}
+              columns={['name', 'branch_name', 'dob', 'email', 'phone', 'account_status', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
+              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }]}
               addRecord={addRecord}
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}
@@ -929,7 +949,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
           )}
 
           {activePage === 'fees' && (
-            <FeesView data={data} optionSets={optionSets} />
+            <FeesView data={data} optionSets={optionSets} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} />
           )}
 
           {activePage === 'payments' && (

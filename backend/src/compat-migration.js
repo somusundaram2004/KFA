@@ -64,6 +64,7 @@ async function migrate() {
     await addColumn(table, 'branch_id', 'INT NULL')
   }
   await addColumn('students', 'photo_url', 'VARCHAR(500) NULL')
+  await addColumn('students', 'account_status', "VARCHAR(20) DEFAULT 'active'")
   await addColumn('staff', 'photo_url', 'VARCHAR(500) NULL')
   await addColumn('staff', 'bio', 'TEXT NULL')
   await addColumn('courses', 'description', 'TEXT NULL')
@@ -83,6 +84,9 @@ async function migrate() {
   await addColumn('fees', 'total_amount', 'DECIMAL(10,2) NULL')
   await addColumn('fees', 'paid_amount', 'DECIMAL(10,2) NULL')
   await addColumn('fees', 'due_amount', 'DECIMAL(10,2) NULL')
+  await addColumn('fees', 'fee_frequency', "VARCHAR(20) DEFAULT 'monthly'")
+  await addColumn('fees', 'billing_day', 'INT NULL')
+  await addColumn('fees', 'due_day', 'INT NULL')
 
   await query('ALTER TABLE fees MODIFY status VARCHAR(20) NULL')
 

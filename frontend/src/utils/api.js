@@ -12,7 +12,17 @@ export async function api(path, options = {}) {
     },
     ...options,
   })
-  if (!response.ok) throw new Error('API request failed')
+  if (!response.ok) {
+    let detail = {}
+    try {
+      detail = await response.json()
+    } catch {
+      detail = {}
+    }
+    const error = new Error(detail.message || 'API request failed')
+    error.status = response.status
+    throw error
+  }
   return response.json()
 }
 

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { query } from '../db.js'
 import { requireAuth, allowRoles } from '../middleware/auth.js'
-import { ensureEventProgramTables, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler, dobToPassword, pick } from '../utils.js'
 
 const router = Router()
@@ -11,12 +11,12 @@ const tables = {
   branches: ['branch_name', 'location', 'phone'],
   users: ['name', 'dob', 'password', 'role', 'email', 'phone', 'branch_id'],
   staff: ['user_id', 'specialization', 'salary', 'branch_id', 'photo_url', 'bio'],
-  students: ['user_id', 'admission_date', 'parent_name', 'branch_id', 'photo_url'],
+  students: ['user_id', 'admission_date', 'parent_name', 'branch_id', 'photo_url', 'account_status'],
   courses: ['course_name', 'description', 'duration', 'fees'],
   classes: ['course_id', 'staff_id', 'branch_id', 'day_of_week', 'start_time', 'end_time'],
   enrollments: ['student_id', 'course_id', 'enrollment_date'],
   attendance: ['student_id', 'class_id', 'date', 'status'],
-  fees: ['student_id', 'branch_id', 'fee_type', 'course_id', 'program_id', 'grade_id', 'university_program_id', 'total_amount', 'paid_amount', 'due_amount', 'status'],
+  fees: ['student_id', 'branch_id', 'fee_type', 'course_id', 'program_id', 'grade_id', 'university_program_id', 'total_amount', 'paid_amount', 'due_amount', 'status', 'fee_frequency', 'billing_day', 'due_day'],
   payments: ['fee_id', 'amount', 'payment_date'],
   enquiries: ['name', 'phone', 'email', 'course_interested', 'message'],
   notifications: ['title', 'message', 'role'],
@@ -85,6 +85,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
   const role = req.user.role
   if (role === 'admin') {
     await ensurePersonPhotoColumns()
+    await ensureFeeScheduleColumns()
     const [
       branches,
       students,
@@ -227,11 +228,27 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
   }
 
   if (role === 'staff') {
-    const staffRows = await query('SELECT id FROM staff WHERE user_id = ?', [req.user.id])
+    const staffRows = await query('SELECT st.*, u.name, u.email, u.phone, b.branch_name FROM staff st JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = st.branch_id WHERE st.user_id = ?', [req.user.id])
     const staffId = staffRows[0]?.id
-    const [classes, students, notifications, event_programs, event_program_items, event_program_teams, event_program_participants] = await Promise.all([
-      query('SELECT c.*, co.course_name FROM classes c JOIN courses co ON co.id = c.course_id WHERE c.staff_id = ?', [staffId]),
+    const [classes, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants] = await Promise.all([
+      query('SELECT c.*, co.course_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE c.staff_id = ?', [staffId]),
       query('SELECT s.*, u.name, u.email, u.phone FROM students s JOIN users u ON u.id = s.user_id ORDER BY u.name'),
+      query(`SELECT e.*, u.name student_name, co.course_name
+        FROM enrollments e
+        JOIN students s ON s.id = e.student_id
+        JOIN users u ON u.id = s.user_id
+        JOIN courses co ON co.id = e.course_id
+        WHERE e.course_id IN (SELECT course_id FROM classes WHERE staff_id = ?)
+        ORDER BY u.name`, [staffId]),
+      query(`SELECT a.*, u.name student_name, co.course_name, b.branch_name
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        JOIN users u ON u.id = s.user_id
+        JOIN classes c ON c.id = a.class_id
+        JOIN courses co ON co.id = c.course_id
+        LEFT JOIN branches b ON b.id = c.branch_id
+        WHERE c.staff_id = ?
+        ORDER BY a.date DESC, a.id DESC`, [staffId]),
       query("SELECT * FROM notifications WHERE role IN ('staff', 'all') ORDER BY created_at DESC"),
       query(`SELECT DISTINCT ep.*, b.branch_name
         FROM event_programs ep
@@ -254,16 +271,50 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         WHERE ept.staff_id = ? OR epp.branch_id IN (SELECT branch_id FROM staff WHERE id = ?)
         ORDER BY epp.id DESC`, [staffId, staffId]),
     ])
-    return res.json({ classes, students, notifications, event_programs, event_program_items, event_program_teams, event_program_participants })
+    return res.json({ staff: staffRows, classes, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants })
   }
 
-  const studentRows = await query('SELECT id FROM students WHERE user_id = ?', [req.user.id])
+  const studentRows = await query(`SELECT s.*, u.name, u.dob, u.email, u.phone, b.branch_name
+    FROM students s
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN branches b ON b.id = s.branch_id
+    WHERE s.user_id = ?
+    LIMIT 1`, [req.user.id])
   const studentId = studentRows[0]?.id
+  await ensureFeeScheduleColumns()
+  if (!studentId) {
+    const notifications = await query("SELECT * FROM notifications WHERE role IN ('student', 'all') ORDER BY created_at DESC")
+    return res.json({
+      students: studentRows,
+      student_academics: [],
+      academic_results: [],
+      enrollments: [],
+      schedule: [],
+      attendance: [],
+      fees: [],
+      payments: [],
+      notifications,
+      event_programs: [],
+      event_program_items: [],
+      event_program_participants: [],
+      event_program_charges: [],
+    })
+  }
   const [enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
     query('SELECT e.*, co.course_name FROM enrollments e JOIN courses co ON co.id = e.course_id WHERE e.student_id = ?', [studentId]),
-    query('SELECT c.*, co.course_name FROM classes c JOIN courses co ON co.id = c.course_id JOIN enrollments e ON e.course_id = c.course_id WHERE e.student_id = ?', [studentId]),
-    query('SELECT a.*, co.course_name FROM attendance a JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id WHERE a.student_id = ?', [studentId]),
-    query('SELECT * FROM fees WHERE student_id = ?', [studentId]),
+    query('SELECT c.*, co.course_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id JOIN enrollments e ON e.course_id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE e.student_id = ?', [studentId]),
+    query('SELECT a.*, co.course_name, b.branch_name FROM attendance a JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE a.student_id = ?', [studentId]),
+    query(`SELECT f.*, u.name student_name, b.branch_name, co.course_name, p.program_name, gl.grade_name, up.program_name university_program_name
+      FROM fees f
+      JOIN students s ON s.id = f.student_id
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN branches b ON b.id = f.branch_id
+      LEFT JOIN courses co ON co.id = f.course_id
+      LEFT JOIN programs p ON p.id = f.program_id
+      LEFT JOIN grade_levels gl ON gl.id = f.grade_id
+      LEFT JOIN university_programs up ON up.id = f.university_program_id
+      WHERE f.student_id = ?
+      ORDER BY f.id DESC`, [studentId]),
     query(`SELECT py.*, f.fee_type
       FROM payments py
       JOIN fees f ON f.id = py.fee_id
@@ -296,20 +347,40 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       ORDER BY epp.id DESC`, [studentId]),
     query('SELECT epc.*, ep.program_name FROM event_program_charges epc JOIN event_programs ep ON ep.id = epc.event_program_id WHERE epc.student_id = ? ORDER BY epc.id DESC', [studentId]),
   ])
-  res.json({ enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges })
+  const academics = await query(`SELECT sa.*, u.name student_name, b.branch_name, p.program_name, gl.grade_name, up.program_name university_program_name
+    FROM student_academics sa
+    JOIN students s ON s.id = sa.student_id
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN branches b ON b.id = sa.branch_id
+    LEFT JOIN programs p ON p.id = sa.program_id
+    LEFT JOIN grade_levels gl ON gl.id = sa.grade_id
+    LEFT JOIN university_programs up ON up.id = sa.university_program_id
+    WHERE sa.student_id = ?
+    ORDER BY sa.id DESC`, [studentId])
+  const results = await query(`SELECT ar.*, u.name student_name, gl.grade_name, ue.exam_name, up.program_name university_program_name
+    FROM academic_results ar
+    JOIN students s ON s.id = ar.student_id
+    JOIN users u ON u.id = s.user_id
+    LEFT JOIN grade_exams ge ON ge.id = ar.grade_exam_id
+    LEFT JOIN grade_levels gl ON gl.id = ge.grade_id
+    LEFT JOIN university_exams ue ON ue.id = ar.university_exam_id
+    LEFT JOIN university_programs up ON up.id = ue.university_program_id
+    WHERE ar.student_id = ?
+    ORDER BY ar.id DESC`, [studentId])
+  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges })
 }))
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, program_id, grade_id, university_program_id, start_date, status } = req.body
+  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, start_date, status } = req.body
   const password = await bcrypt.hash(dobToPassword(dob), 10)
   const userResult = await query(
     'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [name, dob, password, 'student', email, phone, branch_id],
   )
   const studentResult = await query(
-    'INSERT INTO students (user_id, admission_date, parent_name, branch_id, photo_url) VALUES (?, ?, ?, ?, ?)',
-    [userResult.insertId, admission_date, parent_name, branch_id, photo_url],
+    'INSERT INTO students (user_id, admission_date, parent_name, branch_id, photo_url, account_status) VALUES (?, ?, ?, ?, ?, ?)',
+    [userResult.insertId, admission_date, parent_name, branch_id, photo_url, account_status || 'active'],
   )
   if (program_id || grade_id || university_program_id) {
     await query(
@@ -317,18 +388,18 @@ router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
       [studentResult.insertId, branch_id, program_id || null, grade_id || null, university_program_id || null, start_date || admission_date, status || 'active'],
     )
   }
-  res.status(201).json({ id: studentResult.insertId, user_id: userResult.insertId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, program_id, grade_id, university_program_id, start_date, status })
+  res.status(201).json({ id: studentResult.insertId, user_id: userResult.insertId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, start_date, status })
 }))
 
 router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, program_id, grade_id, university_program_id, start_date, status } = req.body
+  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, start_date, status } = req.body
   const studentRows = await query('SELECT user_id FROM students WHERE id = ?', [req.params.id])
   const userId = studentRows[0]?.user_id
   if (!userId) return res.status(404).json({ message: 'Student not found' })
 
   await query('UPDATE users SET name = ?, dob = ?, email = ?, phone = ?, branch_id = ? WHERE id = ?', [name, dob, email, phone, branch_id, userId])
-  await query('UPDATE students SET admission_date = ?, parent_name = ?, branch_id = ?, photo_url = ? WHERE id = ?', [admission_date, parent_name, branch_id, photo_url, req.params.id])
+  await query('UPDATE students SET admission_date = ?, parent_name = ?, branch_id = ?, photo_url = ?, account_status = ? WHERE id = ?', [admission_date, parent_name, branch_id, photo_url, account_status || 'active', req.params.id])
   const academicRows = await query('SELECT id FROM student_academics WHERE student_id = ? ORDER BY id DESC LIMIT 1', [req.params.id])
   if (program_id || grade_id || university_program_id) {
     if (academicRows[0]) {
@@ -343,7 +414,7 @@ router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
       )
     }
   }
-  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, program_id, grade_id, university_program_id, start_date, status })
+  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, start_date, status })
 }))
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {
@@ -401,6 +472,15 @@ function normalizeEventCharge(body) {
   return body
 }
 
+function normalizeFee(body) {
+  const total = Number(body.total_amount || body.amount || 0)
+  const paid = Number(body.paid_amount || 0)
+  body.due_amount = body.due_amount ?? Math.max(total - paid, 0)
+  body.status = body.status || (Number(body.due_amount || 0) <= 0 && paid > 0 ? 'paid' : paid > 0 ? 'partial' : 'pending')
+  body.fee_frequency = body.fee_frequency || 'monthly'
+  return body
+}
+
 for (const [table, fields] of Object.entries(tables)) {
   const guard = table === 'attendance' ? allowRoles('admin', 'staff') : table === 'fees' ? allowRoles('admin', 'student') : adminOnly
 
@@ -409,7 +489,9 @@ for (const [table, fields] of Object.entries(tables)) {
   }))
 
   router.post(`/${table}`, guard, asyncHandler(async (req, res) => {
-    const body = table === 'event_program_charges' ? normalizeEventCharge(pick(req.body, fields)) : pick(req.body, fields)
+    let body = pick(req.body, fields)
+    if (table === 'event_program_charges') body = normalizeEventCharge(body)
+    if (table === 'fees') body = normalizeFee(body)
     if (table === 'users' && body.password) body.password = await bcrypt.hash(body.password, 10)
     const values = fields.map((field) => body[field])
     const result = await query(insertSql(table, fields), values)
@@ -419,7 +501,9 @@ for (const [table, fields] of Object.entries(tables)) {
   }))
 
   router.put(`/${table}/:id`, guard, asyncHandler(async (req, res) => {
-    const body = table === 'event_program_charges' ? normalizeEventCharge(pick(req.body, fields)) : pick(req.body, fields)
+    let body = pick(req.body, fields)
+    if (table === 'event_program_charges') body = normalizeEventCharge(body)
+    if (table === 'fees') body = normalizeFee(body)
     if (table === 'users' && body.password) body.password = await bcrypt.hash(body.password, 10)
     await query(updateSql(table, fields), [...fields.map((field) => body[field]), req.params.id])
     if (table === 'payments') await recalculateFee(body.fee_id)

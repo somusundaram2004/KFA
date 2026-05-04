@@ -6,6 +6,7 @@ import { getStore, saveStore } from './utils/storage'
 import Landing from './pages/public/Landing'
 import EnquiryPage from './pages/public/EnquiryPage'
 import Login from './pages/auth/Login'
+import RegisterStudent from './pages/auth/RegisterStudent'
 import AdminDashboard from './pages/admin pages/Dashboard'
 import StaffDashboard from './pages/staff pages/Dashboard'
 import StudentDashboard from './pages/student pages/Dashboard'
@@ -124,6 +125,17 @@ function App() {
     notify('Enquiry submitted. Admin can view it in the ERP.')
   }
 
+  async function handleStudentRegister(form) {
+    try {
+      await api('/auth/register-student', { method: 'POST', body: JSON.stringify(form) })
+      notify('Registered successfully. Admin must activate your login.')
+      navigate('login')
+    } catch (error) {
+      console.warn('[APP] Student registration failed', error)
+      notify('Registration failed. Student may already exist.')
+    }
+  }
+
   async function handleLogin({ name, password, roleScope }) {
     console.log('[LOGIN UI] Submit', { name, roleScope, passwordLength: password.length })
     try {
@@ -150,6 +162,10 @@ function App() {
       navigate(`${result.user.role}-dashboard`)
       return
     } catch (error) {
+      if (error.status === 403) {
+        notify(error.message || 'Student account is waiting for admin activation.')
+        return
+      }
       console.warn('[LOGIN UI] API login failed, trying local demo data', error)
       const user = data.users.find((item) => item.name.toLowerCase() === name.toLowerCase() && dobPassword(item.dob) === password)
       if (!user || (roleScope === 'admin' && user.role !== 'admin') || (roleScope === 'portal' && user.role === 'admin')) {
@@ -261,10 +277,11 @@ function App() {
       />
       {visiblePage === 'home' && <Landing data={data} navigate={navigate} onEnquiry={handleEnquiry} />}
       {visiblePage === 'enquiry' && <EnquiryPage onSubmit={handleEnquiry} />}
-      {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} admin />}
-      {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} />}
+      {visiblePage === 'register-student' && <RegisterStudent branches={data.branches} onRegister={handleStudentRegister} navigate={navigate} />}
+      {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
+      {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} navigate={navigate} />}
       {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
-      {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} />}
+      {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}
     </div>

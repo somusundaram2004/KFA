@@ -12,8 +12,20 @@ async function hasColumn(table, column) {
 export async function ensurePersonPhotoColumns() {
   if (!personPhotoColumnsReady) {
     personPhotoColumnsReady = (async () => {
+      if (!(await hasColumn('users', 'branch_id'))) {
+        await query('ALTER TABLE users ADD COLUMN branch_id INT NULL')
+      }
+      if (!(await hasColumn('students', 'branch_id'))) {
+        await query('ALTER TABLE students ADD COLUMN branch_id INT NULL')
+      }
+      if (!(await hasColumn('staff', 'branch_id'))) {
+        await query('ALTER TABLE staff ADD COLUMN branch_id INT NULL')
+      }
       if (!(await hasColumn('students', 'photo_url'))) {
         await query('ALTER TABLE students ADD COLUMN photo_url VARCHAR(500) NULL')
+      }
+      if (!(await hasColumn('students', 'account_status'))) {
+        await query("ALTER TABLE students ADD COLUMN account_status VARCHAR(20) DEFAULT 'active'")
       }
       if (!(await hasColumn('staff', 'photo_url'))) {
         await query('ALTER TABLE staff ADD COLUMN photo_url VARCHAR(500) NULL')
@@ -33,6 +45,18 @@ export async function ensureSiteContentTable() {
     )
   }
   return siteContentTableReady
+}
+
+export async function ensureFeeScheduleColumns() {
+  if (!(await hasColumn('fees', 'fee_frequency'))) {
+    await query("ALTER TABLE fees ADD COLUMN fee_frequency VARCHAR(20) DEFAULT 'monthly'")
+  }
+  if (!(await hasColumn('fees', 'billing_day'))) {
+    await query('ALTER TABLE fees ADD COLUMN billing_day INT NULL')
+  }
+  if (!(await hasColumn('fees', 'due_day'))) {
+    await query('ALTER TABLE fees ADD COLUMN due_day INT NULL')
+  }
 }
 
 export async function ensureEventProgramTables() {
