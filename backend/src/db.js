@@ -5,7 +5,7 @@ dotenv.config()
 
 const dbConfig = {
   host: process.env.MYSQLHOST,
-  port: process.env.MYSQLPORT,
+  port: Number(process.env.MYSQLPORT),
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,

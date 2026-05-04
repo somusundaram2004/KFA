@@ -8,6 +8,8 @@ const bgVideo = 'https://res.cloudinary.com/drreokecb/video/upload/v1777871039/B
 function mediaSrc(url) {
   if (!url) return ''
   if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
+  if (url.startsWith('uploads/')) return `${API_ORIGIN}/${url}`
+  if (url.startsWith('http://localhost:5000')) return url.replace('http://localhost:5000', API_ORIGIN)
   return url
 }
 

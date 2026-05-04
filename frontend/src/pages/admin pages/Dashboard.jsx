@@ -11,6 +11,8 @@ function cleanRecord(record) {
 function mediaSrc(url) {
   if (!url) return ''
   if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
+  if (url.startsWith('uploads/')) return `${API_ORIGIN}/${url}`
+  if (url.startsWith('http://localhost:5000')) return url.replace('http://localhost:5000', API_ORIGIN)
   return url
 }
 
@@ -304,7 +306,7 @@ function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord 
   )
 }
 
-export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, sidebarOpen, setSidebarOpen }) {
+export default function AdminDashboard({ data, navigate, logout, addRecord, updateRecord, deleteRecord, sidebarOpen, setSidebarOpen }) {
   const [activePage, setActivePage] = useState('overview')
   const workspaceRef = useRef(null)
   const stats = [
@@ -371,6 +373,11 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     })
   }
 
+  function go(next) {
+    setSidebarOpen(false)
+    navigate(next)
+  }
+
   return (
     <DashboardFrame title="Admin Dashboard" role="Administrator" fullScreen>
       <div className={`admin-layout${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -381,6 +388,12 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
           onClick={() => setSidebarOpen(false)}
         ></button>
         <aside className="admin-sidebar" aria-label="Admin work areas">
+          <div className="admin-mobile-links" aria-label="Main navigation">
+            <button type="button" onClick={() => go('home')}>Website</button>
+            <button type="button" onClick={() => go('enquiry')}>Enquiry</button>
+            <button type="button" onClick={() => go('admin-dashboard')}>Dashboard</button>
+            <button className="solid" type="button" onClick={logout}>Logout</button>
+          </div>
           <div className="admin-sidebar-title">
             <strong>Admin Dashboard</strong>
           </div>

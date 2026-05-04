@@ -160,6 +160,8 @@ function App() {
       const savedRecord = withDisplayFields({ ...record, ...saved }, data)
       if (type === 'class_media' && savedRecord.media_url?.startsWith('/uploads')) {
         savedRecord.media_url = `${API_ORIGIN}${savedRecord.media_url}`
+      } else if (type === 'class_media' && savedRecord.media_url?.startsWith('http://localhost:5000')) {
+        savedRecord.media_url = savedRecord.media_url.replace('http://localhost:5000', API_ORIGIN)
       }
       updateData((current) => ({ ...current, [type]: [savedRecord, ...(current[type] || [])] }))
       try {
@@ -231,7 +233,7 @@ function App() {
       {visiblePage === 'enquiry' && <EnquiryPage onSubmit={handleEnquiry} />}
       {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} admin />}
       {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} />}
-      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} navigate={navigate} logout={logout} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}

@@ -1,37 +1,59 @@
+import { useState } from 'react'
 import logo from '../assets/Logo.png'
 
 export default function Header({ session, navigate, logout, showAdminMenu, onAdminMenuClick, adminMenuOpen }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const menuOpen = showAdminMenu ? adminMenuOpen : mobileNavOpen
+
+  function toggleMenu() {
+    if (showAdminMenu) {
+      onAdminMenuClick()
+      return
+    }
+    setMobileNavOpen((open) => !open)
+  }
+
+  function go(next) {
+    setMobileNavOpen(false)
+    navigate(next)
+  }
+
+  function signOut() {
+    setMobileNavOpen(false)
+    logout()
+  }
+
+  const menuClass = menuOpen ? (showAdminMenu ? ' admin-menu-open' : ' mobile-nav-open') : ''
+
   return (
-    <header className={`site-header${adminMenuOpen ? ' admin-menu-open' : ''}`}>
-      <button className="brand" onClick={() => navigate('home')}>
+    <header className={`site-header${menuClass}`}>
+      <button className="brand" onClick={() => go('home')}>
         <img src={logo} alt="KFA logo" />
         <span>KFA Music Academy</span>
       </button>
-      {showAdminMenu && (
-        <button
-          className="sidebar-toggle header-sidebar-toggle"
-          type="button"
-          aria-label={adminMenuOpen ? 'Close admin menu' : 'Open admin menu'}
-          aria-expanded={adminMenuOpen}
-          onClick={onAdminMenuClick}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-      )}
+      <button
+        className="sidebar-toggle header-sidebar-toggle"
+        type="button"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        aria-expanded={menuOpen}
+        onClick={toggleMenu}
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <nav>
-        <button onClick={() => navigate('home')}>Website</button>
-        <button onClick={() => navigate('enquiry')}>Enquiry</button>
+        <button onClick={() => go('home')}>Website</button>
+        <button onClick={() => go('enquiry')}>Enquiry</button>
         {session ? (
           <>
-            <button onClick={() => navigate(`${session.role}-dashboard`)}>Dashboard</button>
-            <button className="solid" onClick={logout}>Logout</button>
+            <button onClick={() => go(`${session.role}-dashboard`)}>Dashboard</button>
+            <button className="solid" onClick={signOut}>Logout</button>
           </>
         ) : (
           <>
-            <button onClick={() => navigate('ladmin')}>Admin</button>
-            <button className="solid" onClick={() => navigate('login')}>Student / Staff Login</button>
+            <button onClick={() => go('ladmin')}>Admin</button>
+            <button className="solid" onClick={() => go('login')}>Student / Staff Login</button>
           </>
         )}
       </nav>
