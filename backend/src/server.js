@@ -12,12 +12,16 @@ const app = express()
 const port = process.env.PORT || 5000
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://kfa.vercel.app',
-  ],
-  credentials: true,
+  origin: function(origin, callback) {
+    if (!origin || origin.endsWith('.vercel.app') || origin === 'http://localhost:5173') {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true
 }))
+
 app.use(express.json())
 app.use('/uploads', express.static('uploads'))
 
