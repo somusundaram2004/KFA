@@ -26,9 +26,16 @@ function App() {
   }, [])
 
   useEffect(() => {
-    Promise.all([api('/public/courses'), api('/public/class-media')])
-      .then(([courses, classMedia]) => {
-        updateData((current) => ({ ...current, courses, class_media: classMedia }))
+    Promise.all([
+      api('/public/courses'),
+      api('/public/branches'),
+      api('/public/classes'),
+      api('/public/class-media'),
+      api('/public/staff'),
+      api('/public/site-content'),
+    ])
+      .then(([courses, branches, classes, classMedia, staff, siteContent]) => {
+        updateData((current) => ({ ...current, courses, branches, classes, class_media: classMedia, staff, site_content: siteContent }))
       })
       .catch(() => {})
   }, [])
@@ -205,6 +212,17 @@ function App() {
     notify('Deleted successfully.')
   }
 
+  async function updateSiteContent(siteContent) {
+    try {
+      const saved = await api('/site-content/homepage', { method: 'PUT', body: JSON.stringify(siteContent) })
+      updateData((current) => ({ ...current, site_content: saved }))
+    } catch (error) {
+      console.warn('[APP] Site content save failed, updating locally', error)
+      updateData((current) => ({ ...current, site_content: siteContent }))
+    }
+    notify('Site content updated successfully.')
+  }
+
   function markAttendance(record) {
     addRecord('attendance', {
       ...record,
@@ -225,7 +243,7 @@ function App() {
         session={session}
         navigate={navigate}
         logout={logout}
-        showAdminMenu={visiblePage === 'admin-dashboard' && currentRole === 'admin'}
+        showAdminMenu={visiblePage === 'admin-dashboard'}
         adminMenuOpen={adminMenuOpen}
         onAdminMenuClick={() => setAdminMenuOpen((open) => !open)}
       />
@@ -233,7 +251,7 @@ function App() {
       {visiblePage === 'enquiry' && <EnquiryPage onSubmit={handleEnquiry} />}
       {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} admin />}
       {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} />}
-      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} navigate={navigate} logout={logout} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}

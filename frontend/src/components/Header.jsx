@@ -43,15 +43,17 @@ export default function Header({ session, navigate, logout, showAdminMenu, onAdm
         <span></span>
       </button>
       <nav>
-        <button onClick={() => go('home')}>Website</button>
-        <button onClick={() => go('enquiry')}>Enquiry</button>
         {session ? (
           <>
+            <button onClick={() => go('home')}>Home</button>
             <button onClick={() => go(`${session.role}-dashboard`)}>Dashboard</button>
+            <button onClick={() => go('enquiry')}>Enquiry</button>
             <button className="solid" onClick={signOut}>Logout</button>
           </>
         ) : (
           <>
+            <button onClick={() => go('home')}>Home</button>
+            <button onClick={() => go('enquiry')}>Enquiry</button>
             <button onClick={() => go('ladmin')}>Admin</button>
             <button className="solid" onClick={() => go('login')}>Student / Staff Login</button>
           </>

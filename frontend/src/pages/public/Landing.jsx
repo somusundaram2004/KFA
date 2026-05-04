@@ -5,6 +5,81 @@ import InlineEnquiry from '../../components/InlineEnquiry'
 
 const bgVideo = 'https://res.cloudinary.com/drreokecb/video/upload/v1777871039/Bgvideo_exgier.mp4'
 
+export const defaultSiteContent = {
+  sitePrimaryColor: '#ed0012',
+  siteSecondaryColor: '#2f2482',
+  siteDarkColor: '#171141',
+  siteLightColor: '#f8f5ef',
+  siteSurfaceColor: '#ffffff',
+  heroTitleSize: '5.7rem',
+  sectionSpacing: '72px',
+  cardRadius: '8px',
+  animationStrength: '1',
+  heroEyebrow: 'Admissions open for 2026',
+  heroTitle: 'Learn music, instruments, and dance with stage-ready training',
+  heroText: 'KFA Music Academy helps children, teens, and adults build confidence through structured classes, expert faculty, personal attention, and regular performance practice.',
+  heroPrimaryButton: 'Book a Free Demo Class',
+  heroSecondaryButton: 'View Courses',
+  trustOne: 'Weekend and weekday batches',
+  trustTwo: 'Beginner to advanced levels',
+  trustThree: 'Performance-focused learning',
+  heroStatNumber: '4+',
+  heroStatLabel: 'creative programs',
+  aboutLabel: 'About KFA',
+  aboutTitle: 'A focused academy for music, rhythm, and performance',
+  aboutText: 'From first notes to confident stage presence, our classes blend technique, discipline, creativity, and guided practice. Parents and learners get clear schedules, updates, and progress visibility through the academy portal.',
+  highlightOneTitle: 'Personal coaching',
+  highlightOneText: 'Small batches with attention to each learner',
+  highlightTwoTitle: 'Certified curriculum',
+  highlightTwoText: 'Step-by-step training with practice targets',
+  highlightThreeTitle: 'Stage exposure',
+  highlightThreeText: 'Recitals, showcases, and confidence building',
+  highlightFourTitle: 'Parent updates',
+  highlightFourText: 'Attendance, fees, and schedule visibility',
+  coursesLabel: 'Courses',
+  coursesTitle: 'Choose your creative path',
+  branchCoursesLabel: 'Branch-wise Courses',
+  branchCoursesTitle: 'Choose the nearest learning space',
+  timingLabel: 'Batch Timings',
+  timingTitle: 'Weekday evenings and weekend full-day batches',
+  weekdayTitle: 'Weekdays',
+  weekdaySubtitle: 'Evening batches',
+  weekdayTime: '5:00 PM to 9:00 PM',
+  weekendTitle: 'Weekends',
+  weekendSubtitle: 'Morning to evening batches',
+  weekendTime: '9:00 AM to 8:00 PM',
+  galleryLabel: 'Class Gallery',
+  galleryTitle: 'Photos and videos from our learning spaces',
+  facultyLabel: 'Faculty',
+  facultyTitle: 'Meet our staffs',
+  testimonialsLabel: 'Testimonials',
+  testimonialsTitle: 'Loved by students and parents',
+  testimonialOneQuote: 'The teachers keep the classes disciplined but warm. My child started performing with much more confidence.',
+  testimonialOneName: 'Parent of a vocal student',
+  testimonialTwoQuote: 'The demo class made course selection easy, and the regular updates help us follow practice at home.',
+  testimonialTwoName: 'Parent of a keyboard student',
+  testimonialThreeQuote: 'Stage practice and small batches helped me improve rhythm, timing, and confidence together.',
+  testimonialThreeName: 'Dance student',
+  eventsLabel: 'Events',
+  eventsTitle: 'Performance and progress moments',
+  eventOneTitle: 'Stage Recitals',
+  eventOneText: 'Regular performance practice for students to build confidence.',
+  eventTwoTitle: 'Certificate Focus',
+  eventTwoText: 'Structured learning paths for grade, academy, and university programs.',
+  eventThreeTitle: 'Parent Review Days',
+  eventThreeText: 'Progress sharing, attendance visibility, and guidance for home practice.',
+  admissionEyebrow: 'New batches starting soon',
+  admissionTitle: 'Start with a free counselling and demo session',
+  admissionButton: 'Enquire Now',
+  branchesLabel: 'Branches',
+  branchesTitle: 'Find KFA near you',
+  contactPhoneDisplay: '+91 98840 12802',
+  contactWhatsappNumber: '919884012802',
+  contactEmail: 'kfamusicacademy@gmail.com',
+  contactHours: 'Weekdays 5 PM-9 PM | Weekends 9 AM-8 PM',
+  whatsappMessage: 'Hi KFA Music Academy, I would like to enquire about classes.',
+}
+
 function mediaSrc(url) {
   if (!url) return ''
   if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
@@ -22,7 +97,37 @@ function imageForCourse(courseName) {
   return 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=1200&q=80'
 }
 
-function CourseCard({ course }) {
+function imageForTeacher(staff, index) {
+  if (staff.photo_url) return mediaSrc(staff.photo_url)
+  const specialization = (staff.specialization || '').toLowerCase()
+  if (specialization.includes('dance')) return 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=900&q=80'
+  if (specialization.includes('keyboard') || specialization.includes('piano')) return 'https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?auto=format&fit=crop&w=900&q=80'
+  if (specialization.includes('guitar')) return 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?auto=format&fit=crop&w=900&q=80'
+  if (specialization.includes('drum')) return 'https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?auto=format&fit=crop&w=900&q=80'
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&w=900&q=80',
+  ]
+  return fallbackImages[index % fallbackImages.length]
+}
+
+function formatTime(value) {
+  if (!value) return ''
+  const [hourValue, minute = '00'] = String(value).split(':')
+  const hour = Number(hourValue)
+  const suffix = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minute} ${suffix}`
+}
+
+function courseLevel(courseName) {
+  const name = courseName.toLowerCase()
+  if (name.includes('dance')) return 'Kids, teens, and adults'
+  if (name.includes('keyboard') || name.includes('piano') || name.includes('guitar')) return 'Beginner to intermediate'
+  return 'Beginner to advanced'
+}
+
+function CourseCard({ course, onSelect }) {
   return (
     <article className="card">
       <img className="course-thumb" src={imageForCourse(course.course_name)} alt={`${course.course_name} class`} />
@@ -32,7 +137,36 @@ function CourseCard({ course }) {
         <span>{course.duration}</span>
         <strong>Rs. {Number(course.fees).toLocaleString('en-IN')}</strong>
       </div>
+      <button className="course-detail-button" type="button" onClick={() => onSelect(course)}>View Details</button>
     </article>
+  )
+}
+
+function CourseDetailModal({ course, onClose, onEnquire, siteContent }) {
+  if (!course) return null
+
+  return (
+    <div className="course-modal" role="dialog" aria-modal="true" aria-labelledby="course-modal-title" onClick={onClose}>
+      <article className="course-modal-panel" onClick={(event) => event.stopPropagation()}>
+        <button className="lightbox-close" type="button" onClick={onClose}>Close</button>
+        <img src={imageForCourse(course.course_name)} alt={`${course.course_name} class`} />
+        <div className="course-modal-copy">
+          <span className="eyebrow">Course Details</span>
+          <h2 id="course-modal-title">{course.course_name}</h2>
+          <p>{course.description}</p>
+          <div className="course-detail-grid">
+            <span><strong>Duration</strong>{course.duration || 'Flexible batches'}</span>
+            <span><strong>Fees</strong>Rs. {Number(course.fees || 0).toLocaleString('en-IN')}</span>
+            <span><strong>Level</strong>{courseLevel(course.course_name)}</span>
+            <span><strong>Demo</strong>Free counselling available</span>
+          </div>
+          <div className="hero-actions">
+            <button className="primary" type="button" onClick={() => onEnquire(course)}>Enquire for this course</button>
+            <a className="whatsapp-inline" href={`https://wa.me/${siteContent.contactWhatsappNumber}?text=${encodeURIComponent(`Hi KFA Music Academy, I want details for ${course.course_name}.`)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+          </div>
+        </div>
+      </article>
+    </div>
   )
 }
 
@@ -83,8 +217,46 @@ function MediaGallery({ media }) {
 
 export default function Landing({ data, navigate, onEnquiry }) {
   const [activeCourse, setActiveCourse] = useState('All')
+  const [selectedCourse, setSelectedCourse] = useState(null)
+  const savedContent = typeof data.site_content === 'string' ? JSON.parse(data.site_content || '{}') : data.site_content || {}
+  const siteContent = { ...defaultSiteContent, ...savedContent }
+  const themeStyle = {
+    '--site-primary': siteContent.sitePrimaryColor,
+    '--site-secondary': siteContent.siteSecondaryColor,
+    '--site-dark': siteContent.siteDarkColor,
+    '--site-light': siteContent.siteLightColor,
+    '--site-surface': siteContent.siteSurfaceColor,
+    '--site-hero-title-size': siteContent.heroTitleSize,
+    '--site-section-spacing': siteContent.sectionSpacing,
+    '--site-card-radius': siteContent.cardRadius,
+    '--site-animation-strength': siteContent.animationStrength,
+  }
+  const testimonials = [
+    { quote: siteContent.testimonialOneQuote, name: siteContent.testimonialOneName },
+    { quote: siteContent.testimonialTwoQuote, name: siteContent.testimonialTwoName },
+    { quote: siteContent.testimonialThreeQuote, name: siteContent.testimonialThreeName },
+  ].filter((item) => item.quote || item.name)
+  const eventHighlights = [
+    [siteContent.eventOneTitle, siteContent.eventOneText],
+    [siteContent.eventTwoTitle, siteContent.eventTwoText],
+    [siteContent.eventThreeTitle, siteContent.eventThreeText],
+  ].filter(([title, text]) => title || text)
+  const branchLocations = (data.branches || []).map((branch) => {
+    const branchClassCourses = (data.classes || [])
+      .filter((item) => String(item.branch_id || '') === String(branch.id || ''))
+      .map((item) => item.course_name)
+      .filter(Boolean)
+    const courses = [...new Set(branchClassCourses.length ? branchClassCourses : (data.courses || []).map((course) => course.course_name))]
+    return {
+      name: branch.branch_name || 'KFA Branch',
+      academy: branch.branch_name || 'KFA Music Academy',
+      address: branch.location || 'Tamil Nadu',
+      courses: courses.length ? courses : ['Music', 'Dance', 'Instrument training'],
+    }
+  })
   const galleryItems = (data.class_media || []).filter((item) => item.media_url)
   const categories = ['All', 'Vocal', 'Instrument', 'Dance']
+  const featuredClasses = (data.classes || []).slice(0, 6)
   const visibleCourses = data.courses.filter((course) => {
     const name = course.course_name.toLowerCase()
     if (activeCourse === 'All') return true
@@ -93,44 +265,50 @@ export default function Landing({ data, navigate, onEnquiry }) {
     return name.includes('dance')
   })
 
+  function enquireForCourse(course) {
+    setSelectedCourse(null)
+    navigate('enquiry')
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
+  }
+
   return (
-    <main>
+    <main className="site-home" style={themeStyle}>
       <section className="hero-section">
         <video className="hero-bg-video" autoPlay muted loop playsInline aria-hidden="true">
           <source src={bgVideo} type="video/mp4" />
         </video>
         <div className="hero-video-overlay" aria-hidden="true"></div>
         <div className="hero-copy">
-          <span className="eyebrow">Admissions open for 2026</span>
-          <h1>Learn music, instruments, and dance with stage-ready training</h1>
-          <p>KFA Music Academy helps children, teens, and adults build confidence through structured classes, expert faculty, personal attention, and regular performance practice.</p>
+          <span className="eyebrow">{siteContent.heroEyebrow}</span>
+          <h1>{siteContent.heroTitle}</h1>
+          <p>{siteContent.heroText}</p>
           <div className="hero-actions">
-            <button className="primary" onClick={() => navigate('enquiry')}>Book a Free Demo Class</button>
-            <button onClick={() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' })}>View Courses</button>
+            <button className="primary" onClick={() => navigate('enquiry')}>{siteContent.heroPrimaryButton}</button>
+            <button onClick={() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' })}>{siteContent.heroSecondaryButton}</button>
           </div>
           <div className="trust-row">
-            <span>Weekend and weekday batches</span>
-            <span>Beginner to advanced levels</span>
-            <span>Performance-focused learning</span>
+            <span>{siteContent.trustOne}</span>
+            <span>{siteContent.trustTwo}</span>
+            <span>{siteContent.trustThree}</span>
           </div>
         </div>
-        <div className="hero-stat"><strong>4+</strong><span>creative programs</span></div>
+        <div className="hero-stat"><strong>{siteContent.heroStatNumber}</strong><span>{siteContent.heroStatLabel}</span></div>
       </section>
       <section className="band about-grid">
         <div>
-          <span className="eyebrow">About KFA</span>
-          <h2>A focused academy for music, rhythm, and performance</h2>
+          <span className="eyebrow">{siteContent.aboutLabel}</span>
+          <h2>{siteContent.aboutTitle}</h2>
         </div>
-        <p>From first notes to confident stage presence, our classes blend technique, discipline, creativity, and guided practice. Parents and learners get clear schedules, updates, and progress visibility through the academy portal.</p>
+        <p>{siteContent.aboutText}</p>
       </section>
       <section className="section highlights">
-        <article><strong>Personal coaching</strong><span>Small batches with attention to each learner</span></article>
-        <article><strong>Certified curriculum</strong><span>Step-by-step training with practice targets</span></article>
-        <article><strong>Stage exposure</strong><span>Recitals, showcases, and confidence building</span></article>
-        <article><strong>Parent updates</strong><span>Attendance, fees, and schedule visibility</span></article>
+        <article><strong>{siteContent.highlightOneTitle}</strong><span>{siteContent.highlightOneText}</span></article>
+        <article><strong>{siteContent.highlightTwoTitle}</strong><span>{siteContent.highlightTwoText}</span></article>
+        <article><strong>{siteContent.highlightThreeTitle}</strong><span>{siteContent.highlightThreeText}</span></article>
+        <article><strong>{siteContent.highlightFourTitle}</strong><span>{siteContent.highlightFourText}</span></article>
       </section>
       <section className="section" id="courses">
-        <SectionTitle label="Courses" title="Choose your creative path" />
+        <SectionTitle label={siteContent.coursesLabel} title={siteContent.coursesTitle} />
         <div className="filter-tabs" aria-label="Course categories">
           {categories.map((category) => (
             <button className={activeCourse === category ? 'active' : ''} key={category} onClick={() => setActiveCourse(category)}>
@@ -139,46 +317,142 @@ export default function Landing({ data, navigate, onEnquiry }) {
           ))}
         </div>
         <div className="card-grid">
-          {visibleCourses.map((course) => <CourseCard key={course.id} course={course} />)}
+          {visibleCourses.map((course) => <CourseCard key={course.id} course={course} onSelect={setSelectedCourse} />)}
+        </div>
+      </section>
+      <section className="band branch-courses">
+        <SectionTitle label={siteContent.branchCoursesLabel} title={siteContent.branchCoursesTitle} />
+        <div className="branch-course-grid">
+          {branchLocations.map((branch) => (
+            <article key={branch.name}>
+              <span>{branch.name}</span>
+              <h3>{branch.academy}</h3>
+              <ul>
+                {branch.courses.map((course) => <li key={course}>{course}</li>)}
+              </ul>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="section timetable-section">
+        <SectionTitle label={siteContent.timingLabel} title={siteContent.timingTitle} />
+        <div className="timetable-grid">
+          <article className="timing-card">
+            <strong>{siteContent.weekdayTitle}</strong>
+            <span>{siteContent.weekdaySubtitle}</span>
+            <p>{siteContent.weekdayTime}</p>
+          </article>
+          <article className="timing-card">
+            <strong>{siteContent.weekendTitle}</strong>
+            <span>{siteContent.weekendSubtitle}</span>
+            <p>{siteContent.weekendTime}</p>
+          </article>
+          {featuredClasses.map((item) => (
+            <article className="schedule-card" key={item.id}>
+              <strong>{item.course_name}</strong>
+              <span>{item.branch_name || 'KFA Branch'}</span>
+              <p>{item.day_of_week} · {formatTime(item.start_time)} - {formatTime(item.end_time)}</p>
+            </article>
+          ))}
         </div>
       </section>
       {!!galleryItems.length && (
         <section className="band">
-          <SectionTitle label="Class Gallery" title="Photos and videos from our learning spaces" />
+          <SectionTitle label={siteContent.galleryLabel} title={siteContent.galleryTitle} />
           <MediaGallery media={galleryItems} />
         </section>
       )}
       <section className="band">
-        <SectionTitle label="Faculty" title="Learn with experienced mentors" />
+        <SectionTitle label={siteContent.facultyLabel} title={siteContent.facultyTitle} />
         <div className="faculty-list">
-          {data.staff.map((staff) => (
-            <article key={staff.id}>
-              <strong>{staff.name}</strong>
-              <span>{staff.specialization}</span>
+          {data.staff.map((staff, index) => (
+            <article className="teacher-card" key={staff.id} style={{ '--teacher-delay': `${index * 0.12}s` }}>
+              <div className="teacher-card-copy">
+                <strong>{staff.name}</strong>
+                <span>{staff.specialization || 'Music Mentor'}</span>
+                {staff.bio && <small>{staff.bio}</small>}
+              </div>
+              <img className="teacher-card-photo" src={imageForTeacher(staff, index)} alt={`${staff.name} teacher`} />
             </article>
           ))}
         </div>
       </section>
       <section className="section two-column">
         <div>
-          <SectionTitle label="Testimonials" title="Loved by students and parents" />
-          <blockquote>"KFA made learning music disciplined and joyful. The demo class helped us choose the right course, and the regular updates keep us involved."</blockquote>
-          <div className="testimonial-name">- Parent of a keyboard student</div>
+          <SectionTitle label={siteContent.testimonialsLabel} title={siteContent.testimonialsTitle} />
+          <div className="testimonial-strip">
+            {testimonials.map((item) => (
+              <blockquote key={item.name}>
+                "{item.quote}"
+                <span>- {item.name}</span>
+              </blockquote>
+            ))}
+          </div>
         </div>
         <InlineEnquiry onSubmit={onEnquiry} />
       </section>
+      <section className="band event-highlights">
+        <SectionTitle label={siteContent.eventsLabel} title={siteContent.eventsTitle} />
+        <div className="event-grid">
+          {eventHighlights.map(([title, text]) => (
+            <article key={title}>
+              <strong>{title}</strong>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
       <section className="admission-banner">
         <div>
-          <span className="eyebrow">New batches starting soon</span>
-          <h2>Start with a free counselling and demo session</h2>
+          <span className="eyebrow">{siteContent.admissionEyebrow}</span>
+          <h2>{siteContent.admissionTitle}</h2>
         </div>
-        <button className="primary" onClick={() => navigate('enquiry')}>Enquire Now</button>
+        <button className="primary" onClick={() => navigate('enquiry')}>{siteContent.admissionButton}</button>
+      </section>
+      <section className="section branch-locations">
+        <SectionTitle label={siteContent.branchesLabel} title={siteContent.branchesTitle} />
+        <div className="branch-location-shell">
+          {branchLocations.map((branch) => {
+            const mapQuery = `${branch.academy}, ${branch.address}`
+            return (
+              <article className="branch-location-card" key={branch.name}>
+                <div className="branch-map-copy">
+                  <span className="branch-tag">{branch.name}</span>
+                  <h3>{branch.academy}</h3>
+                  <p>{branch.address}</p>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open in Google Maps
+                  </a>
+                </div>
+                <div className="branch-map-frame">
+                  <iframe
+                    title={`${branch.name} map`}
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  ></iframe>
+                </div>
+              </article>
+            )
+          })}
+        </div>
       </section>
       <section className="contact-strip">
-        <span>Call: +91 90000 00000</span>
-        <span>Email: admissions@kfaacademy.test</span>
-        <span>Open: Mon-Sat, 9 AM-8 PM</span>
+        <span>Call / WhatsApp: {siteContent.contactPhoneDisplay}</span>
+        <span>Email: {siteContent.contactEmail}</span>
+        <span>Open: {siteContent.contactHours}</span>
       </section>
+      <a className="floating-whatsapp" href={`https://wa.me/${siteContent.contactWhatsappNumber}?text=${encodeURIComponent(siteContent.whatsappMessage)}`} target="_blank" rel="noreferrer" aria-label="Enquire on WhatsApp">
+        <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <path d="M16 3.4c-6.9 0-12.5 5.4-12.5 12.1 0 2.4.7 4.7 2.1 6.7l-1.4 6.4 6.6-1.5c1.6.8 3.4 1.2 5.2 1.2 6.9 0 12.5-5.4 12.5-12.1S22.9 3.4 16 3.4Zm0 22.8c-1.6 0-3.1-.4-4.5-1.2l-.5-.3-3.9.9.8-3.8-.3-.5c-1.2-1.7-1.8-3.7-1.8-5.8 0-5.5 4.6-10 10.2-10s10.2 4.5 10.2 10-4.6 10.7-10.2 10.7Zm5.8-7.4c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.5-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.5-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5-.1-.2-.7-1.8-1-2.4-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1.1 1.1-1.1 2.6s1.1 3 1.3 3.2c.2.2 2.2 3.4 5.3 4.7.7.3 1.3.5 1.8.6.8.2 1.4.2 2 .1.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.3-.2-.5-.3-.8-.4Z" />
+        </svg>
+      </a>
+      <CourseDetailModal course={selectedCourse} onClose={() => setSelectedCourse(null)} onEnquire={enquireForCourse} siteContent={siteContent} />
     </main>
   )
 }
+

@@ -3,6 +3,8 @@ import DashboardFrame from '../../components/DashboardFrame'
 import DataSection from '../../components/DataSection'
 import StatGrid from '../../components/StatGrid'
 import { API_ORIGIN, api } from '../../utils/api'
+import { downloadReceipt, feeReceiptData, openReceipt, whatsappReceiptUrl } from '../../utils/receipts'
+import { defaultSiteContent } from '../public/Landing'
 
 function cleanRecord(record) {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, value === '' ? null : value]))
@@ -19,6 +21,20 @@ function mediaSrc(url) {
 function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
   const blank = useMemo(() => Object.fromEntries(fields.map((field) => [field.name, field.defaultValue || ''])), [fields])
   const [form, setForm] = useState(initialRecord ? { ...blank, ...initialRecord } : blank)
+  const [uploadingField, setUploadingField] = useState('')
+
+  async function uploadFieldFile(field, file) {
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    setUploadingField(field.name)
+    try {
+      const uploaded = await api(field.uploadPath || '/uploads/materials', { method: 'POST', body: formData })
+      setForm((current) => ({ ...current, [field.name]: uploaded.url }))
+    } finally {
+      setUploadingField('')
+    }
+  }
 
   return (
     <form className="panel form-grid" onSubmit={(event) => {
@@ -41,12 +57,23 @@ function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
             </select>
           ) : field.type === 'textarea' ? (
             <textarea required={field.required !== false} value={form[field.name] ?? ''} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
+          ) : field.type === 'file' ? (
+            <>
+              <input type="file" accept={field.accept || 'image/*'} required={field.required !== false && !form[field.name]} onChange={(event) => uploadFieldFile(field, event.target.files?.[0])} />
+              {uploadingField === field.name && <small>Uploading...</small>}
+              {form[field.name] && (
+                <div className="upload-preview">
+                  <img src={mediaSrc(form[field.name])} alt={`${field.label} preview`} />
+                  <span>Photo ready</span>
+                </div>
+              )}
+            </>
           ) : (
             <input type={field.type || 'text'} required={field.required !== false} value={form[field.name] ?? ''} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
           )}
         </label>
       ))}
-      <button className="primary">{initialRecord ? 'Update' : 'Save'}</button>
+      <button className="primary" disabled={Boolean(uploadingField)}>{uploadingField ? 'Uploading...' : initialRecord ? 'Update' : 'Save'}</button>
     </form>
   )
 }
@@ -119,6 +146,139 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
   )
 }
 
+const siteContentGroups = [
+  {
+    title: 'Theme Studio',
+    hint: 'Change the public homepage colors, spacing, and size rhythm.',
+    fields: [
+      ['sitePrimaryColor', 'Primary Color', 'color'], ['siteSecondaryColor', 'Secondary Color', 'color'],
+      ['siteDarkColor', 'Dark Text / Panels', 'color'], ['siteLightColor', 'Page Background', 'color'],
+      ['siteSurfaceColor', 'Card Surface', 'color'], ['heroTitleSize', 'Hero Title Size'],
+      ['sectionSpacing', 'Section Spacing'], ['cardRadius', 'Card Radius'], ['animationStrength', 'Animation Strength'],
+    ],
+  },
+  {
+    title: 'Hero',
+    hint: 'Top section text, buttons, and trust badges.',
+    fields: [
+      ['heroEyebrow', 'Hero Eyebrow'], ['heroTitle', 'Hero Title'], ['heroText', 'Hero Text', 'textarea'],
+      ['heroPrimaryButton', 'Hero Primary Button'], ['heroSecondaryButton', 'Hero Secondary Button'],
+      ['trustOne', 'Trust Item 1'], ['trustTwo', 'Trust Item 2'], ['trustThree', 'Trust Item 3'],
+      ['heroStatNumber', 'Hero Stat Number'], ['heroStatLabel', 'Hero Stat Label'],
+    ],
+  },
+  {
+    title: 'About And Highlights',
+    hint: 'Intro copy and the four dark highlight cards.',
+    fields: [
+      ['aboutLabel', 'About Label'], ['aboutTitle', 'About Title'], ['aboutText', 'About Text', 'textarea'],
+      ['highlightOneTitle', 'Highlight 1 Title'], ['highlightOneText', 'Highlight 1 Text'],
+      ['highlightTwoTitle', 'Highlight 2 Title'], ['highlightTwoText', 'Highlight 2 Text'],
+      ['highlightThreeTitle', 'Highlight 3 Title'], ['highlightThreeText', 'Highlight 3 Text'],
+      ['highlightFourTitle', 'Highlight 4 Title'], ['highlightFourText', 'Highlight 4 Text'],
+    ],
+  },
+  {
+    title: 'Section Headings And Timings',
+    hint: 'Labels, titles, and public batch timing cards.',
+    fields: [
+      ['coursesLabel', 'Courses Label'], ['coursesTitle', 'Courses Title'],
+      ['branchCoursesLabel', 'Branch Courses Label'], ['branchCoursesTitle', 'Branch Courses Title'],
+      ['timingLabel', 'Timing Label'], ['timingTitle', 'Timing Title'],
+      ['weekdayTitle', 'Weekday Title'], ['weekdaySubtitle', 'Weekday Subtitle'], ['weekdayTime', 'Weekday Time'],
+      ['weekendTitle', 'Weekend Title'], ['weekendSubtitle', 'Weekend Subtitle'], ['weekendTime', 'Weekend Time'],
+      ['galleryLabel', 'Gallery Label'], ['galleryTitle', 'Gallery Title'],
+      ['facultyLabel', 'Faculty Label'], ['facultyTitle', 'Faculty Title'],
+      ['branchesLabel', 'Branches Label'], ['branchesTitle', 'Branches Title'],
+    ],
+  },
+  {
+    title: 'Testimonials And Events',
+    hint: 'Homepage social proof and event highlight cards.',
+    fields: [
+      ['testimonialsLabel', 'Testimonials Label'], ['testimonialsTitle', 'Testimonials Title'],
+      ['testimonialOneQuote', 'Testimonial 1 Quote', 'textarea'], ['testimonialOneName', 'Testimonial 1 Name'],
+      ['testimonialTwoQuote', 'Testimonial 2 Quote', 'textarea'], ['testimonialTwoName', 'Testimonial 2 Name'],
+      ['testimonialThreeQuote', 'Testimonial 3 Quote', 'textarea'], ['testimonialThreeName', 'Testimonial 3 Name'],
+      ['eventsLabel', 'Events Label'], ['eventsTitle', 'Events Title'],
+      ['eventOneTitle', 'Event 1 Title'], ['eventOneText', 'Event 1 Text', 'textarea'],
+      ['eventTwoTitle', 'Event 2 Title'], ['eventTwoText', 'Event 2 Text', 'textarea'],
+      ['eventThreeTitle', 'Event 3 Title'], ['eventThreeText', 'Event 3 Text', 'textarea'],
+    ],
+  },
+  {
+    title: 'CTA And Contact',
+    hint: 'Admission banner, footer contact strip, and WhatsApp button.',
+    fields: [
+      ['admissionEyebrow', 'Admission Eyebrow'], ['admissionTitle', 'Admission Title'], ['admissionButton', 'Admission Button'],
+      ['contactPhoneDisplay', 'Contact Phone Display'], ['contactWhatsappNumber', 'WhatsApp Number'],
+      ['contactEmail', 'Contact Email'], ['contactHours', 'Contact Hours'], ['whatsappMessage', 'WhatsApp Message', 'textarea'],
+    ],
+  },
+]
+
+function SiteContentManager({ siteContent, updateSiteContent }) {
+  const savedContent = typeof siteContent === 'string' ? JSON.parse(siteContent || '{}') : siteContent || {}
+  const [form, setForm] = useState({ ...defaultSiteContent, ...savedContent })
+
+  function updateField(key, value) {
+    setForm((current) => ({ ...current, [key]: value }))
+  }
+
+  return (
+    <form className="panel form-grid site-content-form" onSubmit={(event) => {
+      event.preventDefault()
+      updateSiteContent(cleanRecord(form))
+    }}>
+      <div className="site-content-hero">
+        <div>
+          <span className="eyebrow">Design Studio</span>
+          <h3>Website Site Content</h3>
+          <p>Control public homepage text, colors, spacing, card radius, contact details, and section titles from one place.</p>
+        </div>
+        <button type="button" onClick={() => setForm(defaultSiteContent)}>Reset Defaults</button>
+      </div>
+      <div className="site-content-preview" style={{
+        '--preview-primary': form.sitePrimaryColor,
+        '--preview-secondary': form.siteSecondaryColor,
+        '--preview-dark': form.siteDarkColor,
+        '--preview-light': form.siteLightColor,
+        '--preview-radius': form.cardRadius,
+      }}>
+        <div>
+          <span>{form.heroEyebrow}</span>
+          <strong>{form.heroTitle}</strong>
+          <small>{form.heroPrimaryButton}</small>
+        </div>
+      </div>
+      <p className="empty">Courses, branches, classes, gallery, staff, and student records are managed from their own admin pages. This panel controls the remaining website copy and theme.</p>
+      {siteContentGroups.map((group) => (
+        <section className="site-content-group" key={group.title}>
+          <div className="site-content-group-head">
+            <div>
+              <h4>{group.title}</h4>
+              <p>{group.hint}</p>
+            </div>
+          </div>
+          <div className="site-content-grid">
+            {group.fields.map(([name, label, type]) => (
+              <label className={`field-control${type === 'color' ? ' color-control' : ''}`} key={name}>
+                <span>{label}</span>
+                {type === 'textarea' ? (
+                  <textarea value={form[name] || ''} onChange={(event) => updateField(name, event.target.value)} />
+                ) : (
+                  <input type={type || 'text'} value={form[name] || ''} onChange={(event) => updateField(name, event.target.value)} />
+                )}
+              </label>
+            ))}
+          </div>
+        </section>
+      ))}
+      <button className="primary">Save Website Content</button>
+    </form>
+  )
+}
+
 function AttendanceView({ data }) {
   const [selectedClassId, setSelectedClassId] = useState(data.classes[0]?.id || '')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
@@ -161,6 +321,13 @@ function FeesView({ data, optionSets }) {
   const rows = data.fees.filter((fee) => Object.entries(filters).every(([key, value]) => !value || String(fee[key] ?? '') === String(value)))
   const paidCount = rows.filter((fee) => fee.status === 'paid').length
   const unpaidCount = rows.filter((fee) => fee.status !== 'paid').length
+  const receiptRows = rows
+    .filter((fee) => Number(fee.paid_amount || 0) > 0 || fee.status === 'paid' || data.payments?.some((payment) => Number(payment.fee_id) === Number(fee.id)))
+    .map((fee) => {
+      const student = data.students.find((item) => Number(item.id) === Number(fee.student_id))
+      const payment = data.payments?.find((item) => Number(item.fee_id) === Number(fee.id))
+      return feeReceiptData({ fee, student, payment })
+    })
 
   return (
     <section className="table-section">
@@ -185,7 +352,73 @@ function FeesView({ data, optionSets }) {
         ))}
       </div>
       <DataSection compact title="Student Fee Details" rows={rows} columns={['student_name', 'branch_name', 'fee_type', 'course_name', 'program_name', 'grade_name', 'university_program_name', 'total_amount', 'paid_amount', 'due_amount', 'status']} />
+      {!!receiptRows.length && (
+        <div className="receipt-admin-panel">
+          <h3>Receipt Actions</h3>
+          <div className="receipt-grid">
+            {receiptRows.map((receipt) => (
+              <article className="receipt-card" key={receipt.receiptNo}>
+                <span>{receipt.studentName}</span>
+                <strong>{receipt.receiptNo}</strong>
+                <p>{receipt.item} - Paid Rs. {Number(receipt.paidAmount || 0).toLocaleString('en-IN')}</p>
+                <div className="row-actions">
+                  <button type="button" onClick={() => openReceipt(receipt)}>View</button>
+                  <button type="button" onClick={() => downloadReceipt(receipt)}>Download</button>
+                  <a className="button-link" href={whatsappReceiptUrl(receipt)} target="_blank" rel="noreferrer">WhatsApp</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
+  )
+}
+
+function PaymentsView({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
+  const paymentReceipts = (data.payments || []).map((payment) => {
+    const fee = data.fees.find((item) => Number(item.id) === Number(payment.fee_id))
+    const student = data.students.find((item) => Number(item.id) === Number(fee?.student_id))
+    return feeReceiptData({ fee, student, payment })
+  })
+
+  return (
+    <>
+      <ManagedSection
+        type="payments"
+        title="Add Payment"
+        fields={[
+          { name: 'fee_id', label: 'Fee', type: 'select', options: optionSets.fees },
+          { name: 'amount', label: 'Amount', type: 'number' },
+          { name: 'payment_date', label: 'Payment Date', type: 'date' },
+        ]}
+        rows={data.payments}
+        columns={['student_name', 'fee_type', 'amount', 'payment_date']}
+        filters={[{ name: 'fee_id', label: 'Fee', options: optionSets.fees }]}
+        addRecord={addRecord}
+        updateRecord={updateRecord}
+        deleteRecord={deleteRecord}
+      />
+      {!!paymentReceipts.length && (
+        <section className="table-section">
+          <h3>Payment Receipts</h3>
+          <div className="receipt-grid">
+            {paymentReceipts.map((receipt) => (
+              <article className="receipt-card" key={receipt.receiptNo}>
+                <span>{receipt.studentName}</span>
+                <strong>{receipt.receiptNo}</strong>
+                <p>{receipt.item} - Paid Rs. {Number(receipt.paidAmount || 0).toLocaleString('en-IN')}</p>
+                <div className="row-actions">
+                  <button type="button" onClick={() => openReceipt(receipt)}>View</button>
+                  <button type="button" onClick={() => downloadReceipt(receipt)}>Download</button>
+                  <a className="button-link" href={whatsappReceiptUrl(receipt)} target="_blank" rel="noreferrer">WhatsApp</a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
   )
 }
 
@@ -306,7 +539,7 @@ function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord 
   )
 }
 
-export default function AdminDashboard({ data, navigate, logout, addRecord, updateRecord, deleteRecord, sidebarOpen, setSidebarOpen }) {
+export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, updateSiteContent, sidebarOpen, setSidebarOpen }) {
   const [activePage, setActivePage] = useState('overview')
   const workspaceRef = useRef(null)
   const stats = [
@@ -345,6 +578,7 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
 
   const adminPages = useMemo(() => [
     { id: 'overview', label: 'Overview', detail: 'Today summary' },
+    { id: 'site-content', label: 'Site Content', detail: 'Homepage text' },
     { id: 'branches', label: 'Branches', detail: 'Locations' },
     { id: 'students', label: 'Students', detail: 'Student details' },
     { id: 'staff', label: 'Staff', detail: 'Faculty details' },
@@ -373,11 +607,6 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
     })
   }
 
-  function go(next) {
-    setSidebarOpen(false)
-    navigate(next)
-  }
-
   return (
     <DashboardFrame title="Admin Dashboard" role="Administrator" fullScreen>
       <div className={`admin-layout${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -387,13 +616,7 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
           aria-label="Close admin menu"
           onClick={() => setSidebarOpen(false)}
         ></button>
-        <aside className="admin-sidebar" aria-label="Admin work areas">
-          <div className="admin-mobile-links" aria-label="Main navigation">
-            <button type="button" onClick={() => go('home')}>Website</button>
-            <button type="button" onClick={() => go('enquiry')}>Enquiry</button>
-            <button type="button" onClick={() => go('admin-dashboard')}>Dashboard</button>
-            <button className="solid" type="button" onClick={logout}>Logout</button>
-          </div>
+        <aside className={`admin-sidebar${sidebarOpen ? ' is-open' : ''}`} aria-label="Admin work areas">
           <div className="admin-sidebar-title">
             <strong>Admin Dashboard</strong>
           </div>
@@ -426,6 +649,10 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
             </>
           )}
 
+          {activePage === 'site-content' && (
+            <SiteContentManager siteContent={data.site_content} updateSiteContent={updateSiteContent} />
+          )}
+
           {activePage === 'branches' && (
             <ManagedSection
               type="branches"
@@ -455,6 +682,7 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
                 { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches },
                 { name: 'admission_date', label: 'Admission Date', type: 'date' },
                 { name: 'parent_name', label: 'Parent Name' },
+                { name: 'photo_url', label: 'Student Photo', type: 'file', uploadPath: '/uploads/student-photos', required: false },
                 { name: 'program_id', label: 'Non-Exam Program', type: 'select', options: optionSets.programs, required: false },
                 { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades, required: false },
                 { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
@@ -462,7 +690,7 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
                 { name: 'status', label: 'Academic Status', type: 'select', options: optionSets.statuses, required: false },
               ]}
               rows={data.students}
-              columns={['name', 'branch_name', 'dob', 'email', 'phone', 'admission_date', 'parent_name', 'program_name', 'grade_name', 'university_program_name', 'status']}
+              columns={['name', 'branch_name', 'dob', 'email', 'phone', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
               filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }]}
               addRecord={addRecord}
               updateRecord={updateRecord}
@@ -480,11 +708,13 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
                 { name: 'email', label: 'Email', type: 'email', required: false },
                 { name: 'phone', label: 'Phone', required: false },
                 { name: 'specialization', label: 'Specialization' },
+                { name: 'bio', label: 'Degree / Studies / Staff Details', type: 'textarea', required: false },
                 { name: 'salary', label: 'Salary', type: 'number' },
                 { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches },
+                { name: 'photo_url', label: 'Teacher Photo', type: 'file', uploadPath: '/uploads/staff-photos', required: false },
               ]}
               rows={data.staff}
-              columns={['name', 'branch_name', 'specialization', 'salary', 'email', 'phone']}
+              columns={['name', 'branch_name', 'specialization', 'bio', 'salary', 'email', 'phone', 'photo_url']}
               filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }]}
               addRecord={addRecord}
               updateRecord={updateRecord}
@@ -649,17 +879,9 @@ export default function AdminDashboard({ data, navigate, logout, addRecord, upda
           )}
 
           {activePage === 'payments' && (
-            <ManagedSection
-              type="payments"
-              title="Add Payment"
-              fields={[
-                { name: 'fee_id', label: 'Fee', type: 'select', options: optionSets.fees },
-                { name: 'amount', label: 'Amount', type: 'number' },
-                { name: 'payment_date', label: 'Payment Date', type: 'date' },
-              ]}
-              rows={data.payments}
-              columns={['student_name', 'fee_type', 'amount', 'payment_date']}
-              filters={[{ name: 'fee_id', label: 'Fee', options: optionSets.fees }]}
+            <PaymentsView
+              data={data}
+              optionSets={optionSets}
               addRecord={addRecord}
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}

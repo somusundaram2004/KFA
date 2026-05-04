@@ -39,6 +39,8 @@ CREATE TABLE staff (
     user_id INT NOT NULL,
     specialization VARCHAR(100),
     salary DECIMAL(10,2),
+    photo_url VARCHAR(500),
+    bio TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -47,6 +49,7 @@ CREATE TABLE students (
     user_id INT NOT NULL,
     admission_date DATE,
     parent_name VARCHAR(100),
+    photo_url VARCHAR(500),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -198,4 +201,10 @@ CREATE TABLE user_notifications (
     is_read BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE
+);
+
+CREATE TABLE site_content (
+    content_key VARCHAR(100) PRIMARY KEY,
+    content_value JSON NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

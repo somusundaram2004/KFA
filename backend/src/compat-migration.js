@@ -41,10 +41,16 @@ async function migrate() {
   if (!(await hasTable('academic_results'))) {
     await query("CREATE TABLE academic_results (id INT PRIMARY KEY AUTO_INCREMENT, student_id INT NOT NULL, grade_exam_id INT NULL, university_exam_id INT NULL, marks DECIMAL(5,2), grade VARCHAR(10), result_status ENUM('pass','fail'))")
   }
+  if (!(await hasTable('site_content'))) {
+    await query('CREATE TABLE site_content (content_key VARCHAR(100) PRIMARY KEY, content_value JSON NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)')
+  }
 
   for (const table of ['users', 'students', 'staff', 'classes', 'student_academics', 'fees']) {
     await addColumn(table, 'branch_id', 'INT NULL')
   }
+  await addColumn('students', 'photo_url', 'VARCHAR(500) NULL')
+  await addColumn('staff', 'photo_url', 'VARCHAR(500) NULL')
+  await addColumn('staff', 'bio', 'TEXT NULL')
   await addColumn('courses', 'description', 'TEXT NULL')
   await addColumn('courses', 'duration', 'VARCHAR(50) NULL')
   await addColumn('programs', 'description', 'TEXT NULL')
