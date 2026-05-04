@@ -11,6 +11,10 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
   const today = new Date().toISOString().slice(0, 10)
   const selectedClass = classes.find((item) => String(item.id) === String(selectedClassId))
   const classAttendance = data.attendance.filter((item) => String(item.class_id) === String(selectedClassId))
+  const eventPrograms = data.event_programs || []
+  const eventTeams = data.event_program_teams || []
+  const eventParticipants = data.event_program_participants || []
+  const eventItems = (data.event_program_items || []).filter((item) => eventPrograms.some((program) => Number(program.id) === Number(item.event_program_id)))
 
   function submitAttendance(event) {
     event.preventDefault()
@@ -27,7 +31,7 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
           <p>Manage today&apos;s classes, mark attendance, and send updates to students from one clean screen.</p>
         </div>
       </section>
-      <StatGrid stats={[['Assigned Classes', classes.length], ['Students', data.students.length], ['Marked Records', classAttendance.length], ['Notifications', data.notifications.length]]} />
+      <StatGrid stats={[['Assigned Classes', classes.length], ['Event Programs', eventPrograms.length], ['Program Students', eventParticipants.length], ['Notifications', data.notifications.length]]} />
       <div className="class-card-grid">
         {classes.map((item) => (
           <button key={item.id} type="button" className={String(selectedClassId) === String(item.id) ? 'class-card active' : 'class-card'} onClick={() => setSelectedClassId(item.id)}>
@@ -70,6 +74,10 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
       </div>
       <DataSection title="Class Attendance History" rows={classAttendance} columns={['student_name', 'course_name', 'date', 'status']} />
       <DataSection title="Assigned Classes" rows={classes} columns={['course_name', 'branch_name', 'day_of_week', 'start_time', 'end_time']} />
+      <DataSection title="Assigned Event Programs" rows={eventPrograms} columns={['program_name', 'event_date', 'event_time', 'venue', 'branch_name', 'status']} />
+      <DataSection title="My Program Teams" rows={eventTeams} columns={['program_name', 'team_name', 'team_notes']} />
+      <DataSection title="Program Song / Item Lists" rows={eventItems} columns={['program_name', 'category', 'item_title', 'item_notes', 'display_order']} />
+      <DataSection title="Program Participants" rows={eventParticipants} columns={['program_name', 'student_name', 'team_name', 'course_name', 'branch_name', 'grade_name', 'role_name', 'participation_status', 'notes']} />
     </DashboardFrame>
   )
 }

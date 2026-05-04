@@ -2,7 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { query } from '../db.js'
 import { requireAuth, allowRoles } from '../middleware/auth.js'
-import { ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureEventProgramTables, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler, dobToPassword, pick } from '../utils.js'
 
 const router = Router()
@@ -28,6 +28,11 @@ const tables = {
   grade_exams: ['grade_id', 'exam_date'],
   university_exams: ['university_program_id', 'exam_name', 'exam_date'],
   academic_results: ['student_id', 'grade_exam_id', 'university_exam_id', 'marks', 'grade', 'result_status'],
+  event_programs: ['program_name', 'event_date', 'event_time', 'venue', 'branch_id', 'description', 'status', 'base_fee', 'vehicle_charge', 'extra_charge', 'charge_notes'],
+  event_program_items: ['event_program_id', 'category', 'item_title', 'item_notes', 'display_order'],
+  event_program_teams: ['event_program_id', 'team_name', 'staff_id', 'team_notes'],
+  event_program_participants: ['event_program_id', 'student_id', 'team_id', 'class_id', 'branch_id', 'grade_id', 'role_name', 'participation_status', 'notes'],
+  event_program_charges: ['event_program_id', 'participant_id', 'student_id', 'branch_id', 'charge_type', 'amount', 'paid_amount', 'due_amount', 'status', 'notes'],
 }
 
 const adminOnly = allowRoles('admin')
@@ -60,6 +65,11 @@ router.delete('/class_media/:id', asyncHandler(async (req, res) => {
 }))
 
 router.use(requireAuth)
+
+router.use(asyncHandler(async (_req, _res, next) => {
+  await ensureEventProgramTables()
+  next()
+}))
 
 router.get('/summary', allowRoles('admin'), asyncHandler(async (_req, res) => {
   const [[students], [staff], [courses], [enquiries]] = await Promise.all([
@@ -94,6 +104,11 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       university_exams,
       academic_results,
       payments,
+      event_programs,
+      event_program_items,
+      event_program_teams,
+      event_program_participants,
+      event_program_charges,
     ] = await Promise.all([
       query('SELECT * FROM branches ORDER BY id DESC'),
       query(`SELECT s.*, u.name, u.dob, u.email, u.phone, b.branch_name, sa.program_id, sa.grade_id, sa.university_program_id, sa.start_date, sa.status, p.program_name, gl.grade_name, up.program_name university_program_name
@@ -157,6 +172,32 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         JOIN students s ON s.id = f.student_id
         JOIN users u ON u.id = s.user_id
         ORDER BY py.payment_date DESC, py.id DESC`),
+      query('SELECT ep.*, b.branch_name FROM event_programs ep LEFT JOIN branches b ON b.id = ep.branch_id ORDER BY ep.event_date DESC, ep.id DESC'),
+      query('SELECT epi.*, ep.program_name FROM event_program_items epi JOIN event_programs ep ON ep.id = epi.event_program_id ORDER BY epi.display_order, epi.id DESC'),
+      query('SELECT ept.*, ep.program_name, u.name staff_name FROM event_program_teams ept JOIN event_programs ep ON ep.id = ept.event_program_id LEFT JOIN staff st ON st.id = ept.staff_id LEFT JOIN users u ON u.id = st.user_id ORDER BY ept.id DESC'),
+      query(`SELECT epp.*, ep.program_name, u.name student_name, b.branch_name, co.course_name, gl.grade_name, ept.team_name
+        FROM event_program_participants epp
+        JOIN event_programs ep ON ep.id = epp.event_program_id
+        JOIN students s ON s.id = epp.student_id
+        JOIN users u ON u.id = s.user_id
+        LEFT JOIN branches b ON b.id = epp.branch_id
+        LEFT JOIN classes c ON c.id = epp.class_id
+        LEFT JOIN courses co ON co.id = c.course_id
+        LEFT JOIN grade_levels gl ON gl.id = epp.grade_id
+        LEFT JOIN event_program_teams ept ON ept.id = epp.team_id
+        ORDER BY epp.id DESC`),
+      query(`SELECT epc.*, ep.program_name, u.name student_name, b.branch_name, ept.team_name, co.course_name, gl.grade_name
+        FROM event_program_charges epc
+        JOIN event_programs ep ON ep.id = epc.event_program_id
+        JOIN students s ON s.id = epc.student_id
+        JOIN users u ON u.id = s.user_id
+        LEFT JOIN branches b ON b.id = epc.branch_id
+        LEFT JOIN event_program_participants epp ON epp.id = epc.participant_id
+        LEFT JOIN event_program_teams ept ON ept.id = epp.team_id
+        LEFT JOIN classes c ON c.id = epp.class_id
+        LEFT JOIN courses co ON co.id = c.course_id
+        LEFT JOIN grade_levels gl ON gl.id = epp.grade_id
+        ORDER BY epc.id DESC`),
     ])
     return res.json({
       branches,
@@ -177,23 +218,48 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       university_exams,
       academic_results,
       payments,
+      event_programs,
+      event_program_items,
+      event_program_teams,
+      event_program_participants,
+      event_program_charges,
     })
   }
 
   if (role === 'staff') {
     const staffRows = await query('SELECT id FROM staff WHERE user_id = ?', [req.user.id])
     const staffId = staffRows[0]?.id
-    const [classes, students, notifications] = await Promise.all([
+    const [classes, students, notifications, event_programs, event_program_items, event_program_teams, event_program_participants] = await Promise.all([
       query('SELECT c.*, co.course_name FROM classes c JOIN courses co ON co.id = c.course_id WHERE c.staff_id = ?', [staffId]),
       query('SELECT s.*, u.name, u.email, u.phone FROM students s JOIN users u ON u.id = s.user_id ORDER BY u.name'),
       query("SELECT * FROM notifications WHERE role IN ('staff', 'all') ORDER BY created_at DESC"),
+      query(`SELECT DISTINCT ep.*, b.branch_name
+        FROM event_programs ep
+        LEFT JOIN branches b ON b.id = ep.branch_id
+        LEFT JOIN event_program_teams ept ON ept.event_program_id = ep.id
+        WHERE ept.staff_id = ? OR ep.branch_id IN (SELECT branch_id FROM staff WHERE id = ?)
+        ORDER BY ep.event_date DESC, ep.id DESC`, [staffId, staffId]),
+      query('SELECT epi.*, ep.program_name FROM event_program_items epi JOIN event_programs ep ON ep.id = epi.event_program_id ORDER BY epi.display_order, epi.id DESC'),
+      query('SELECT ept.*, ep.program_name, u.name staff_name FROM event_program_teams ept JOIN event_programs ep ON ep.id = ept.event_program_id LEFT JOIN staff st ON st.id = ept.staff_id LEFT JOIN users u ON u.id = st.user_id WHERE ept.staff_id = ? ORDER BY ept.id DESC', [staffId]),
+      query(`SELECT epp.*, ep.program_name, u.name student_name, b.branch_name, co.course_name, gl.grade_name, ept.team_name
+        FROM event_program_participants epp
+        JOIN event_programs ep ON ep.id = epp.event_program_id
+        JOIN students s ON s.id = epp.student_id
+        JOIN users u ON u.id = s.user_id
+        LEFT JOIN branches b ON b.id = epp.branch_id
+        LEFT JOIN classes c ON c.id = epp.class_id
+        LEFT JOIN courses co ON co.id = c.course_id
+        LEFT JOIN grade_levels gl ON gl.id = epp.grade_id
+        LEFT JOIN event_program_teams ept ON ept.id = epp.team_id
+        WHERE ept.staff_id = ? OR epp.branch_id IN (SELECT branch_id FROM staff WHERE id = ?)
+        ORDER BY epp.id DESC`, [staffId, staffId]),
     ])
-    return res.json({ classes, students, notifications })
+    return res.json({ classes, students, notifications, event_programs, event_program_items, event_program_teams, event_program_participants })
   }
 
   const studentRows = await query('SELECT id FROM students WHERE user_id = ?', [req.user.id])
   const studentId = studentRows[0]?.id
-  const [enrollments, schedule, attendance, fees, payments, notifications] = await Promise.all([
+  const [enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
     query('SELECT e.*, co.course_name FROM enrollments e JOIN courses co ON co.id = e.course_id WHERE e.student_id = ?', [studentId]),
     query('SELECT c.*, co.course_name FROM classes c JOIN courses co ON co.id = c.course_id JOIN enrollments e ON e.course_id = c.course_id WHERE e.student_id = ?', [studentId]),
     query('SELECT a.*, co.course_name FROM attendance a JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id WHERE a.student_id = ?', [studentId]),
@@ -204,8 +270,33 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       WHERE f.student_id = ?
       ORDER BY py.payment_date DESC, py.id DESC`, [studentId]),
     query("SELECT * FROM notifications WHERE role IN ('student', 'all') ORDER BY created_at DESC"),
+    query(`SELECT ep.*, b.branch_name
+      FROM event_programs ep
+      JOIN event_program_participants epp ON epp.event_program_id = ep.id
+      LEFT JOIN branches b ON b.id = ep.branch_id
+      WHERE epp.student_id = ?
+      ORDER BY ep.event_date DESC, ep.id DESC`, [studentId]),
+    query(`SELECT epi.*, ep.program_name
+      FROM event_program_items epi
+      JOIN event_programs ep ON ep.id = epi.event_program_id
+      JOIN event_program_participants epp ON epp.event_program_id = ep.id
+      WHERE epp.student_id = ?
+      ORDER BY epi.display_order, epi.id DESC`, [studentId]),
+    query(`SELECT epp.*, ep.program_name, u.name student_name, b.branch_name, co.course_name, gl.grade_name, ept.team_name
+      FROM event_program_participants epp
+      JOIN event_programs ep ON ep.id = epp.event_program_id
+      JOIN students s ON s.id = epp.student_id
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN branches b ON b.id = epp.branch_id
+      LEFT JOIN classes c ON c.id = epp.class_id
+      LEFT JOIN courses co ON co.id = c.course_id
+      LEFT JOIN grade_levels gl ON gl.id = epp.grade_id
+      LEFT JOIN event_program_teams ept ON ept.id = epp.team_id
+      WHERE epp.student_id = ?
+      ORDER BY epp.id DESC`, [studentId]),
+    query('SELECT epc.*, ep.program_name FROM event_program_charges epc JOIN event_programs ep ON ep.id = epc.event_program_id WHERE epc.student_id = ? ORDER BY epc.id DESC', [studentId]),
   ])
-  res.json({ enrollments, schedule, attendance, fees, payments, notifications })
+  res.json({ enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges })
 }))
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
@@ -302,6 +393,14 @@ async function recalculateFee(feeId) {
   await query('UPDATE fees SET paid_amount = ?, due_amount = ?, status = ? WHERE id = ?', [paid, due, status, feeId])
 }
 
+function normalizeEventCharge(body) {
+  const amount = Number(body.amount || 0)
+  const paid = Number(body.paid_amount || 0)
+  body.due_amount = Math.max(amount - paid, 0)
+  body.status = body.due_amount <= 0 && paid > 0 ? 'paid' : paid > 0 ? 'partial' : body.status || 'pending'
+  return body
+}
+
 for (const [table, fields] of Object.entries(tables)) {
   const guard = table === 'attendance' ? allowRoles('admin', 'staff') : table === 'fees' ? allowRoles('admin', 'student') : adminOnly
 
@@ -310,7 +409,7 @@ for (const [table, fields] of Object.entries(tables)) {
   }))
 
   router.post(`/${table}`, guard, asyncHandler(async (req, res) => {
-    const body = pick(req.body, fields)
+    const body = table === 'event_program_charges' ? normalizeEventCharge(pick(req.body, fields)) : pick(req.body, fields)
     if (table === 'users' && body.password) body.password = await bcrypt.hash(body.password, 10)
     const values = fields.map((field) => body[field])
     const result = await query(insertSql(table, fields), values)
@@ -320,7 +419,7 @@ for (const [table, fields] of Object.entries(tables)) {
   }))
 
   router.put(`/${table}/:id`, guard, asyncHandler(async (req, res) => {
-    const body = pick(req.body, fields)
+    const body = table === 'event_program_charges' ? normalizeEventCharge(pick(req.body, fields)) : pick(req.body, fields)
     if (table === 'users' && body.password) body.password = await bcrypt.hash(body.password, 10)
     await query(updateSql(table, fields), [...fields.map((field) => body[field]), req.params.id])
     if (table === 'payments') await recalculateFee(body.fee_id)

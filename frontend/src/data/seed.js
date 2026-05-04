@@ -57,4 +57,9 @@ export const seed = {
     { id: 1, student_id: 1, student_name: 'Rahul Nair', grade_exam_id: 1, grade_name: 'Grade 1', university_exam_id: null, marks: 86, grade: 'A', result_status: 'pass' },
     { id: 2, student_id: 1, student_name: 'Rahul Nair', grade_exam_id: null, university_exam_id: 1, exam_name: 'Diploma Term 1', university_program_name: 'Diploma in Music', marks: 78, grade: 'B+', result_status: 'pass' },
   ],
+  event_programs: [],
+  event_program_items: [],
+  event_program_teams: [],
+  event_program_participants: [],
+  event_program_charges: [],
 }

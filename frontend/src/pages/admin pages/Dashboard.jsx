@@ -422,6 +422,46 @@ function PaymentsView({ data, optionSets, addRecord, updateRecord, deleteRecord 
   )
 }
 
+function EventProgramReport({ data, optionSets }) {
+  const [filters, setFilters] = useState({ event_program_id: '', branch_id: '', class_id: '', grade_id: '', status: '' })
+  const rows = (data.event_program_charges || []).filter((row) => Object.entries(filters).every(([key, value]) => !value || String(row[key] ?? '') === String(value)))
+  const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const paid = rows.reduce((sum, row) => sum + Number(row.paid_amount || 0), 0)
+  const due = rows.reduce((sum, row) => sum + Number(row.due_amount || 0), 0)
+
+  return (
+    <section className="table-section">
+      <div className="fee-summary">
+        <article><strong>Rs. {total.toLocaleString('en-IN')}</strong><span>Total Charges</span></article>
+        <article><strong>Rs. {paid.toLocaleString('en-IN')}</strong><span>Paid</span></article>
+        <article><strong>Rs. {due.toLocaleString('en-IN')}</strong><span>Due</span></article>
+      </div>
+      <div className="filter-bar">
+        {[
+          { name: 'event_program_id', label: 'Program', options: optionSets.eventPrograms },
+          { name: 'branch_id', label: 'Branch', options: optionSets.branches },
+          { name: 'class_id', label: 'Class', options: optionSets.classes },
+          { name: 'grade_id', label: 'Grade', options: optionSets.grades },
+          { name: 'status', label: 'Payment Status', options: optionSets.feeStatuses },
+        ].map((filter) => (
+          <label className="field-control" key={filter.name}>
+            <span>{filter.label}</span>
+            <select value={filters[filter.name]} onChange={(event) => setFilters({ ...filters, [filter.name]: event.target.value })}>
+              <option value="">All</option>
+              {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+      <DataSection
+        title="Program Fee / Charge Report"
+        rows={rows}
+        columns={['program_name', 'student_name', 'branch_name', 'course_name', 'grade_name', 'team_name', 'charge_type', 'amount', 'paid_amount', 'due_amount', 'status', 'notes']}
+      />
+    </section>
+  )
+}
+
 function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', media_type: 'photo', class_id: '', file: null, media_url: '', thumbnail_url: '' })
@@ -554,6 +594,8 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     ['University Exams', data.university_exams.length],
     ['Results', data.academic_results.length],
     ['Fees', data.fees.length],
+    ['Event Programs', (data.event_programs || []).length],
+    ['Program Charges', (data.event_program_charges || []).length],
     ['Gallery Items', data.class_media.length],
   ]
 
@@ -569,10 +611,16 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     universityPrograms: data.university_programs.map((program) => ({ value: program.id, label: `${program.program_name}${program.university_name ? ` - ${program.university_name}` : ''}` })),
     gradeExams: data.grade_exams.map((exam) => ({ value: exam.id, label: `${exam.grade_name || 'Grade exam'} - ${exam.exam_date || 'No date'}` })),
     universityExams: data.university_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_name || 'University exam'} - ${exam.exam_date || 'No date'}` })),
+    eventPrograms: (data.event_programs || []).map((program) => ({ value: program.id, label: program.program_name })),
+    eventTeams: (data.event_program_teams || []).map((team) => ({ value: team.id, label: `${team.team_name}${team.program_name ? ` - ${team.program_name}` : ''}` })),
+    eventParticipants: (data.event_program_participants || []).map((item) => ({ value: item.id, label: `${item.student_name || 'Student'} - ${item.program_name || 'Program'}` })),
     statuses: ['active', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
+    eventStatuses: ['planning', 'confirmed', 'completed', 'cancelled'].map((status) => ({ value: status, label: status })),
+    participationStatuses: ['selected', 'confirmed', 'practice', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
     resultStatuses: ['pass', 'fail'].map((status) => ({ value: status, label: status })),
     attendanceStatuses: ['present', 'absent'].map((status) => ({ value: status, label: status })),
     feeTypes: ['course', 'program', 'grade', 'university'].map((type) => ({ value: type, label: type })),
+    chargeTypes: ['program fee', 'vehicle charge', 'costume charge', 'food charge', 'specific charge', 'other'].map((type) => ({ value: type, label: type })),
     feeStatuses: ['pending', 'partial', 'paid'].map((status) => ({ value: status, label: status })),
   }
 
@@ -592,6 +640,12 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     { id: 'results', label: 'Results', detail: 'Marks and result' },
     { id: 'fees', label: 'Fees', detail: 'Advanced billing' },
     { id: 'payments', label: 'Payments', detail: 'Fee collections' },
+    { id: 'event-programs', label: 'Event Programs', detail: 'Sudden programs' },
+    { id: 'event-items', label: 'Program Items', detail: 'Songs and lists' },
+    { id: 'event-teams', label: 'Program Teams', detail: 'Team planning' },
+    { id: 'event-participants', label: 'Participants', detail: 'Student teams' },
+    { id: 'event-charges', label: 'Program Charges', detail: 'Fees and vehicle' },
+    { id: 'event-reports', label: 'Program Reports', detail: 'Filtered dues' },
     { id: 'attendance', label: 'Attendance', detail: 'Class attendance' },
     { id: 'enquiries', label: 'Enquiries', detail: 'Lead follow-up' },
   ], [])
@@ -886,6 +940,135 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}
             />
+          )}
+
+          {activePage === 'event-programs' && (
+            <ManagedSection
+              type="event_programs"
+              title="Add Event Program"
+              fields={[
+                { name: 'program_name', label: 'Program Name' },
+                { name: 'event_date', label: 'Event Date', type: 'date', required: false },
+                { name: 'event_time', label: 'Event Time', required: false },
+                { name: 'venue', label: 'Venue', required: false },
+                { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches, required: false },
+                { name: 'description', label: 'Discussion / Description', type: 'textarea', required: false },
+                { name: 'status', label: 'Status', type: 'select', options: optionSets.eventStatuses, required: false },
+                { name: 'base_fee', label: 'Program Fee', type: 'number', required: false },
+                { name: 'vehicle_charge', label: 'Vehicle Charge', type: 'number', required: false },
+                { name: 'extra_charge', label: 'Specific / Extra Charge', type: 'number', required: false },
+                { name: 'charge_notes', label: 'Charge Notes', type: 'textarea', required: false },
+              ]}
+              rows={data.event_programs || []}
+              columns={['program_name', 'event_date', 'event_time', 'venue', 'branch_name', 'status', 'base_fee', 'vehicle_charge', 'extra_charge']}
+              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'status', label: 'Status', options: optionSets.eventStatuses }]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'event-items' && (
+            <ManagedSection
+              type="event_program_items"
+              title="Add Program Item / Song"
+              fields={[
+                { name: 'event_program_id', label: 'Program', type: 'select', options: optionSets.eventPrograms },
+                { name: 'category', label: 'Category', required: false },
+                { name: 'item_title', label: 'Song / Item Title' },
+                { name: 'item_notes', label: 'Notes / Lyrics / List', type: 'textarea', required: false },
+                { name: 'display_order', label: 'Order', type: 'number', required: false },
+              ]}
+              rows={data.event_program_items || []}
+              columns={['program_name', 'category', 'item_title', 'item_notes', 'display_order']}
+              filters={[{ name: 'event_program_id', label: 'Program', options: optionSets.eventPrograms }]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'event-teams' && (
+            <ManagedSection
+              type="event_program_teams"
+              title="Add Program Team"
+              fields={[
+                { name: 'event_program_id', label: 'Program', type: 'select', options: optionSets.eventPrograms },
+                { name: 'team_name', label: 'Team Name' },
+                { name: 'staff_id', label: 'Staff Incharge', type: 'select', options: optionSets.staff, required: false },
+                { name: 'team_notes', label: 'Team Notes', type: 'textarea', required: false },
+              ]}
+              rows={data.event_program_teams || []}
+              columns={['program_name', 'team_name', 'staff_name', 'team_notes']}
+              filters={[{ name: 'event_program_id', label: 'Program', options: optionSets.eventPrograms }, { name: 'staff_id', label: 'Staff', options: optionSets.staff }]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'event-participants' && (
+            <ManagedSection
+              type="event_program_participants"
+              title="Add Program Participant"
+              fields={[
+                { name: 'event_program_id', label: 'Program', type: 'select', options: optionSets.eventPrograms },
+                { name: 'student_id', label: 'Student', type: 'select', options: optionSets.students },
+                { name: 'team_id', label: 'Team', type: 'select', options: optionSets.eventTeams, required: false },
+                { name: 'class_id', label: 'Class', type: 'select', options: optionSets.classes, required: false },
+                { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches, required: false },
+                { name: 'grade_id', label: 'Grade', type: 'select', options: optionSets.grades, required: false },
+                { name: 'role_name', label: 'Role / Part', required: false },
+                { name: 'participation_status', label: 'Status', type: 'select', options: optionSets.participationStatuses, required: false },
+                { name: 'notes', label: 'Notes', type: 'textarea', required: false },
+              ]}
+              rows={data.event_program_participants || []}
+              columns={['program_name', 'student_name', 'team_name', 'course_name', 'branch_name', 'grade_name', 'role_name', 'participation_status', 'notes']}
+              filters={[
+                { name: 'event_program_id', label: 'Program', options: optionSets.eventPrograms },
+                { name: 'branch_id', label: 'Branch', options: optionSets.branches },
+                { name: 'class_id', label: 'Class', options: optionSets.classes },
+                { name: 'grade_id', label: 'Grade', options: optionSets.grades },
+                { name: 'team_id', label: 'Team', options: optionSets.eventTeams },
+              ]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'event-charges' && (
+            <ManagedSection
+              type="event_program_charges"
+              title="Add Program Charge"
+              fields={[
+                { name: 'event_program_id', label: 'Program', type: 'select', options: optionSets.eventPrograms },
+                { name: 'participant_id', label: 'Participant', type: 'select', options: optionSets.eventParticipants, required: false },
+                { name: 'student_id', label: 'Student', type: 'select', options: optionSets.students },
+                { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches, required: false },
+                { name: 'charge_type', label: 'Charge Type', type: 'select', options: optionSets.chargeTypes },
+                { name: 'amount', label: 'Amount', type: 'number' },
+                { name: 'paid_amount', label: 'Paid Amount', type: 'number', required: false },
+                { name: 'due_amount', label: 'Due Amount', type: 'number', required: false },
+                { name: 'status', label: 'Status', type: 'select', options: optionSets.feeStatuses, required: false },
+                { name: 'notes', label: 'Manual Correction Notes', type: 'textarea', required: false },
+              ]}
+              rows={data.event_program_charges || []}
+              columns={['program_name', 'student_name', 'branch_name', 'team_name', 'course_name', 'grade_name', 'charge_type', 'amount', 'paid_amount', 'due_amount', 'status', 'notes']}
+              filters={[
+                { name: 'event_program_id', label: 'Program', options: optionSets.eventPrograms },
+                { name: 'branch_id', label: 'Branch', options: optionSets.branches },
+                { name: 'status', label: 'Status', options: optionSets.feeStatuses },
+                { name: 'charge_type', label: 'Charge Type', options: optionSets.chargeTypes },
+              ]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'event-reports' && (
+            <EventProgramReport data={data} optionSets={optionSets} />
           )}
 
           {activePage === 'attendance' && (

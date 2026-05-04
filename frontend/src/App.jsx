@@ -77,6 +77,9 @@ function App() {
     const fee = source.fees?.find((item) => Number(item.id) === Number(record.fee_id))
     const gradeExam = source.grade_exams?.find((item) => Number(item.id) === Number(record.grade_exam_id))
     const universityExam = source.university_exams?.find((item) => Number(item.id) === Number(record.university_exam_id))
+    const eventProgram = source.event_programs?.find((item) => Number(item.id) === Number(record.event_program_id))
+    const eventTeam = source.event_program_teams?.find((item) => Number(item.id) === Number(record.team_id))
+    const eventParticipant = source.event_program_participants?.find((item) => Number(item.id) === Number(record.participant_id))
 
     const next = { ...record }
     if (branch) next.branch_name = branch.branch_name
@@ -98,6 +101,15 @@ function App() {
     if (universityExam) {
       next.exam_name ||= universityExam.exam_name
       next.university_program_name ||= universityExam.university_program_name
+    }
+    if (eventProgram) next.program_name = eventProgram.program_name
+    if (eventTeam) next.team_name = eventTeam.team_name
+    if (eventParticipant) {
+      next.student_name ||= eventParticipant.student_name
+      next.class_id ||= eventParticipant.class_id
+      next.course_name ||= eventParticipant.course_name
+      next.grade_name ||= eventParticipant.grade_name
+      next.team_name ||= eventParticipant.team_name
     }
     return next
   }

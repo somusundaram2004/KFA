@@ -208,3 +208,64 @@ CREATE TABLE site_content (
     content_value JSON NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE event_programs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    program_name VARCHAR(150) NOT NULL,
+    event_date DATE,
+    event_time VARCHAR(50),
+    venue VARCHAR(200),
+    branch_id INT,
+    description TEXT,
+    status VARCHAR(30) DEFAULT 'planning',
+    base_fee DECIMAL(10,2) DEFAULT 0,
+    vehicle_charge DECIMAL(10,2) DEFAULT 0,
+    extra_charge DECIMAL(10,2) DEFAULT 0,
+    charge_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE event_program_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_program_id INT NOT NULL,
+    category VARCHAR(80),
+    item_title VARCHAR(180) NOT NULL,
+    item_notes TEXT,
+    display_order INT DEFAULT 0
+);
+
+CREATE TABLE event_program_teams (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_program_id INT NOT NULL,
+    team_name VARCHAR(120) NOT NULL,
+    staff_id INT,
+    team_notes TEXT
+);
+
+CREATE TABLE event_program_participants (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_program_id INT NOT NULL,
+    student_id INT NOT NULL,
+    team_id INT,
+    class_id INT,
+    branch_id INT,
+    grade_id INT,
+    role_name VARCHAR(120),
+    participation_status VARCHAR(30) DEFAULT 'selected',
+    notes TEXT
+);
+
+CREATE TABLE event_program_charges (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    event_program_id INT NOT NULL,
+    participant_id INT,
+    student_id INT NOT NULL,
+    branch_id INT,
+    charge_type VARCHAR(80) NOT NULL,
+    amount DECIMAL(10,2) DEFAULT 0,
+    paid_amount DECIMAL(10,2) DEFAULT 0,
+    due_amount DECIMAL(10,2) DEFAULT 0,
+    status VARCHAR(30) DEFAULT 'pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
