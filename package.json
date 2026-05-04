@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "frontend": "npm --prefix frontend run dev",
+    "backend": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build"
+  },
+  "dependencies": {
+    "node": "^24.15.0"
+  }
+}
