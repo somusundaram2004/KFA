@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import AnimatedBackground from './components/AnimatedBackground'
 import Header from './components/Header'
-import { api, dobPassword } from './utils/api'
+import { API_ORIGIN, api, dobPassword } from './utils/api'
 import { getStore, saveStore } from './utils/storage'
 import Landing from './pages/public/Landing'
 import EnquiryPage from './pages/public/EnquiryPage'
@@ -159,7 +159,7 @@ function App() {
       const saved = await api(path, { method: 'POST', body: JSON.stringify(record) })
       const savedRecord = withDisplayFields({ ...record, ...saved }, data)
       if (type === 'class_media' && savedRecord.media_url?.startsWith('/uploads')) {
-        savedRecord.media_url = `http://localhost:5000${savedRecord.media_url}`
+        savedRecord.media_url = `${API_ORIGIN}${savedRecord.media_url}`
       }
       updateData((current) => ({ ...current, [type]: [savedRecord, ...(current[type] || [])] }))
       try {

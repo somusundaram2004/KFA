@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import DashboardFrame from '../../components/DashboardFrame'
 import DataSection from '../../components/DataSection'
 import StatGrid from '../../components/StatGrid'
-import { api } from '../../utils/api'
+import { API_ORIGIN, api } from '../../utils/api'
 
 function cleanRecord(record) {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, value === '' ? null : value]))
@@ -10,7 +10,7 @@ function cleanRecord(record) {
 
 function mediaSrc(url) {
   if (!url) return ''
-  if (url.startsWith('/uploads')) return `http://localhost:5000${url}`
+  if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
   return url
 }
 

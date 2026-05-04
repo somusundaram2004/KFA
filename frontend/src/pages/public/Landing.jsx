@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import bgVideo from '../../assets/Bgvideo.mp4'
+import { API_ORIGIN } from '../../utils/api'
 import SectionTitle from '../../components/SectionTitle'
 import InlineEnquiry from '../../components/InlineEnquiry'
 
+const bgVideo = 'https://res.cloudinary.com/drreokecb/video/upload/v1777871039/Bgvideo_exgier.mp4'
+
 function mediaSrc(url) {
   if (!url) return ''
-  if (url.startsWith('/uploads')) return `http://localhost:5000${url}`
+  if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
   return url
 }
 
