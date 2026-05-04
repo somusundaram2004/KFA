@@ -1,10 +1,14 @@
 import mysql from 'mysql2/promise'
+import dotenv from 'dotenv'
+
+dotenv.config()
+
 const dbConfig = {
-  host: 'localhost',
-  port: 3306,
-  user: 'root',
-  password: String('5225'),
-  database: 'kfa',
+  host: process.env.MYSQLHOST,
+  port: process.env.MYSQLPORT,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
   waitForConnections: true,
   connectionLimit: 10,
 }
