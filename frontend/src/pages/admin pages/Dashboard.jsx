@@ -146,26 +146,40 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
   )
 }
 
-function StudentImportPanel({ importStudents }) {
+function StudentImportPanel({ importStudents, previewStudentImport }) {
+  const [file, setFile] = useState(null)
+  const [previewing, setPreviewing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [preview, setPreview] = useState(null)
   const [summary, setSummary] = useState(null)
 
-  async function submit(event) {
+  async function previewFile(event) {
     event.preventDefault()
-    const file = event.currentTarget.elements.studentFile.files?.[0]
     if (!file) return
+    setPreviewing(true)
+    setSummary(null)
+    try {
+      setPreview(await previewStudentImport(file))
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  async function confirmImport() {
+    if (!file || !preview?.valid) return
     setImporting(true)
     try {
       const result = await importStudents(file)
       setSummary(result)
-      event.currentTarget.reset()
+      setPreview(null)
+      setFile(null)
     } finally {
       setImporting(false)
     }
   }
 
   return (
-    <form className="panel student-import-panel" onSubmit={submit}>
+    <form className="panel student-import-panel" onSubmit={previewFile}>
       <div>
         <span className="eyebrow">Bulk Import</span>
         <h3>Add Students From Excel</h3>
@@ -173,14 +187,44 @@ function StudentImportPanel({ importStudents }) {
       </div>
       <label className="field-control">
         <span>Excel / CSV File</span>
-        <input name="studentFile" type="file" accept=".xlsx,.xls,.csv" required />
+        <input name="studentFile" type="file" accept=".xlsx,.xls,.csv" required value="" onChange={(event) => {
+          setFile(event.target.files?.[0] || null)
+          setPreview(null)
+          setSummary(null)
+        }} />
       </label>
-      <button className="primary" disabled={importing}>{importing ? 'Importing...' : 'Import Students'}</button>
+      <button className="primary" disabled={previewing || !file}>{previewing ? 'Reading...' : 'Preview File'}</button>
       {summary && (
         <div className="import-summary">
           <strong>{summary.created} added</strong>
           <span>{summary.skipped} skipped from {summary.total} rows</span>
           {!!summary.errors?.length && <small>{summary.errors.slice(0, 3).map((item) => `Row ${item.row}: ${item.reason}`).join(' | ')}</small>}
+        </div>
+      )}
+      {preview && (
+        <div className="import-preview">
+          <div className="import-summary">
+            <strong>{preview.valid} ready</strong>
+            <span>{preview.invalid} need checking from {preview.total} rows</span>
+            <button type="button" className="primary" onClick={confirmImport} disabled={importing || !preview.valid}>{importing ? 'Importing...' : `Import ${preview.valid} Students`}</button>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {['row', 'status', 'reason', 'name', 'dob', 'phone', 'parent_name', 'branch_name', 'admission_date', 'account_status'].map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.rows.slice(0, 25).map((row) => (
+                  <tr key={row.row} className={row.status === 'ready' ? 'preview-ready' : 'preview-warning'}>
+                    {['row', 'status', 'reason', 'name', 'dob', 'phone', 'parent_name', 'branch_name', 'admission_date', 'account_status'].map((column) => <td key={column}>{String(row[column] || '-')}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {preview.rows.length > 25 && <p className="hint">Showing first 25 rows only. All ready rows will be imported.</p>}
         </div>
       )}
     </form>
@@ -861,7 +905,7 @@ function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord 
   )
 }
 
-export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, updateSiteContent, importStudents, sidebarOpen, setSidebarOpen }) {
+export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, updateSiteContent, importStudents, previewStudentImport, sidebarOpen, setSidebarOpen }) {
   const [activePage, setActivePage] = useState('overview')
   const workspaceRef = useRef(null)
   const stats = [
@@ -1013,7 +1057,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
 
           {activePage === 'students' && (
             <>
-              <StudentImportPanel importStudents={importStudents} />
+              <StudentImportPanel importStudents={importStudents} previewStudentImport={previewStudentImport} />
               <ManagedSection
                 type="students"
                 title="Add Student"

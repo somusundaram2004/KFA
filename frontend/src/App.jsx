@@ -260,6 +260,12 @@ function App() {
     return result
   }
 
+  async function previewStudentImport(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api('/students/import/preview', { method: 'POST', body: formData })
+  }
+
   function markAttendance(record) {
     const classRow = data.classes.find((item) => Number(item.id) === Number(record.class_id))
     addRecord('attendance', {
@@ -293,7 +299,7 @@ function App() {
       {visiblePage === 'register-student' && <RegisterStudent branches={data.branches} onRegister={handleStudentRegister} navigate={navigate} />}
       {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
       {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} navigate={navigate} />}
-      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} previewStudentImport={previewStudentImport} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}

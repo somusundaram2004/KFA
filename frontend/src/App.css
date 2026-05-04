@@ -1769,6 +1769,33 @@ select {
   color: #6b6174;
 }
 
+.import-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+}
+
+.import-preview .import-summary {
+  justify-content: space-between;
+}
+
+.preview-ready td:first-child,
+.preview-ready td:nth-child(2) {
+  color: #13783c;
+  font-weight: 900;
+}
+
+.preview-warning {
+  background: #fff5f5;
+}
+
+.preview-warning td:first-child,
+.preview-warning td:nth-child(2),
+.preview-warning td:nth-child(3) {
+  color: #ed0012;
+  font-weight: 900;
+}
+
 .compact-control {
   min-width: 190px;
 }

@@ -144,6 +144,59 @@ async function branchIdFromRow(row, branches) {
   return match?.id || null
 }
 
+async function previewStudentRows(file) {
+  await ensurePersonPhotoColumns()
+  const rawRows = await parseStudentImport(file)
+  const branches = await query('SELECT id, branch_name FROM branches')
+  const rows = []
+  let valid = 0
+  let invalid = 0
+
+  for (const [index, rawRow] of rawRows.entries()) {
+    const rowNumber = index + 2
+    const row = normalizeImportRow(rawRow)
+    const name = row.name || ''
+    const dob = normalizeDateValue(row.dob)
+    const admissionDate = normalizeDateValue(row.admission_date) || new Date().toISOString().slice(0, 10)
+    const branchId = await branchIdFromRow(row, branches)
+    const branch = branches.find((item) => Number(item.id) === Number(branchId))
+    let status = 'ready'
+    let reason = ''
+
+    if (!name || !dob) {
+      status = 'error'
+      reason = 'Missing name or dob'
+    } else {
+      const existing = await query('SELECT id FROM users WHERE LOWER(name) = LOWER(?) AND dob = ? LIMIT 1', [name, dob])
+      if (existing[0]) {
+        status = 'duplicate'
+        reason = 'Student already exists'
+      }
+    }
+
+    if (status === 'ready') valid += 1
+    else invalid += 1
+
+    rows.push({
+      row: rowNumber,
+      status,
+      reason,
+      name,
+      dob,
+      phone: row.phone || '',
+      email: row.email || '',
+      parent_name: row.parent_name || '',
+      branch_id: branchId,
+      branch_name: branch?.branch_name || row.branch_name || '',
+      admission_date: admissionDate,
+      account_status: row.account_status || 'active',
+      photo_url: row.photo_url || '',
+    })
+  }
+
+  return { total: rows.length, valid, invalid, rows }
+}
+
 router.post('/class_media', asyncHandler(async (req, res) => {
   const fields = tables.class_media
   const body = pick(req.body, fields)
@@ -519,44 +572,34 @@ router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
 
 router.post('/students/import', adminOnly, importUpload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Excel file is required.' })
-  await ensurePersonPhotoColumns()
-  const rawRows = await parseStudentImport(req.file)
-  const branches = await query('SELECT id, branch_name FROM branches')
-  const summary = { total: rawRows.length, created: 0, skipped: 0, errors: [] }
+  const preview = await previewStudentRows(req.file)
+  const summary = { total: preview.total, created: 0, skipped: 0, errors: [] }
 
-  for (const [index, rawRow] of rawRows.entries()) {
-    const rowNumber = index + 2
-    const row = normalizeImportRow(rawRow)
-    const name = row.name || ''
-    const dob = normalizeDateValue(row.dob)
-
-    if (!name || !dob) {
+  for (const row of preview.rows) {
+    if (row.status !== 'ready') {
       summary.skipped += 1
-      summary.errors.push({ row: rowNumber, reason: 'Missing name or dob' })
+      summary.errors.push({ row: row.row, reason: row.reason })
       continue
     }
 
-    const existing = await query('SELECT id FROM users WHERE LOWER(name) = LOWER(?) AND dob = ? LIMIT 1', [name, dob])
-    if (existing[0]) {
-      summary.skipped += 1
-      summary.errors.push({ row: rowNumber, reason: 'Student already exists' })
-      continue
-    }
-
-    const branchId = await branchIdFromRow(row, branches)
-    const password = await bcrypt.hash(dobToPassword(dob), 10)
+    const password = await bcrypt.hash(dobToPassword(row.dob), 10)
     const userResult = await query(
       'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, dob, password, 'student', row.email || null, row.phone || null, branchId],
+      [row.name, row.dob, password, 'student', row.email || null, row.phone || null, row.branch_id || null],
     )
     await query(
       'INSERT INTO students (user_id, admission_date, parent_name, branch_id, photo_url, account_status) VALUES (?, ?, ?, ?, ?, ?)',
-      [userResult.insertId, normalizeDateValue(row.admission_date) || new Date().toISOString().slice(0, 10), row.parent_name || null, branchId, row.photo_url || null, row.account_status || 'active'],
+      [userResult.insertId, row.admission_date, row.parent_name || null, row.branch_id || null, row.photo_url || null, row.account_status || 'active'],
     )
     summary.created += 1
   }
 
   res.status(201).json(summary)
+}))
+
+router.post('/students/import/preview', adminOnly, importUpload.single('file'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Excel file is required.' })
+  res.json(await previewStudentRows(req.file))
 }))
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {
