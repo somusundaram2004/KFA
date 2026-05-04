@@ -152,6 +152,8 @@ CREATE TABLE attendance (
     student_id INT NOT NULL,
     class_id INT NOT NULL,
     date DATE,
+    day_of_week VARCHAR(20),
+    attendance_time TIME,
     status ENUM('present', 'absent'),
     FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
     FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE

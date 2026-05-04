@@ -146,6 +146,47 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
   )
 }
 
+function StudentImportPanel({ importStudents }) {
+  const [importing, setImporting] = useState(false)
+  const [summary, setSummary] = useState(null)
+
+  async function submit(event) {
+    event.preventDefault()
+    const file = event.currentTarget.elements.studentFile.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const result = await importStudents(file)
+      setSummary(result)
+      event.currentTarget.reset()
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <form className="panel student-import-panel" onSubmit={submit}>
+      <div>
+        <span className="eyebrow">Bulk Import</span>
+        <h3>Add Students From Excel</h3>
+        <p className="hint">Use columns like name, dob, phone, email, parent_name, branch_name, admission_date, account_status.</p>
+      </div>
+      <label className="field-control">
+        <span>Excel / CSV File</span>
+        <input name="studentFile" type="file" accept=".xlsx,.xls,.csv" required />
+      </label>
+      <button className="primary" disabled={importing}>{importing ? 'Importing...' : 'Import Students'}</button>
+      {summary && (
+        <div className="import-summary">
+          <strong>{summary.created} added</strong>
+          <span>{summary.skipped} skipped from {summary.total} rows</span>
+          {!!summary.errors?.length && <small>{summary.errors.slice(0, 3).map((item) => `Row ${item.row}: ${item.reason}`).join(' | ')}</small>}
+        </div>
+      )}
+    </form>
+  )
+}
+
 const siteContentGroups = [
   {
     title: 'Theme Studio',
@@ -309,8 +350,8 @@ function AttendanceView({ data }) {
             <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
           </label>
         </div>
-        <DataSection compact title="Selected Date" rows={rows} columns={['student_name', 'course_name', 'branch_name', 'date', 'status']} />
-        <DataSection compact title="Previous Attendance" rows={previousRows} columns={['student_name', 'course_name', 'branch_name', 'date', 'status']} />
+        <DataSection compact title="Selected Date" rows={rows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
+        <DataSection compact title="Previous Attendance" rows={previousRows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
       </section>
     </>
   )
@@ -479,6 +520,230 @@ function EventProgramReport({ data, optionSets }) {
   )
 }
 
+function escapeHtml(value) {
+  return String(value ?? '-')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+function openPrintableReport({ title, subtitle, meta = [], sections = [] }) {
+  const sectionHtml = sections.map((section) => `
+    <section>
+      <h2>${escapeHtml(section.title)}</h2>
+      ${section.rows.length ? `
+        <table>
+          <thead><tr>${section.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${section.rows.map((row, index) => `
+              <tr>${section.columns.map((column) => `<td>${escapeHtml(column.render ? column.render(row, index) : row[column.key])}</td>`).join('')}</tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : '<p class="empty">No records available for this selection.</p>'}
+    </section>
+  `).join('')
+
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(title)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f0ea; color: #171141; font-family: Arial, sans-serif; }
+      .actions { position: sticky; top: 0; display: flex; justify-content: center; gap: 10px; padding: 12px; background: #171141; }
+      button { border: 0; border-radius: 6px; background: #ed0012; color: #fff; padding: 10px 14px; font-weight: 800; cursor: pointer; }
+      main { width: min(1120px, calc(100% - 32px)); margin: 22px auto; background: #fff; border: 1px solid #ded8ec; border-radius: 10px; overflow: hidden; }
+      header { display: flex; align-items: center; gap: 16px; padding: 18px 22px; background: linear-gradient(135deg, #171141, #2f2482); color: #fff; }
+      header img { width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; }
+      h1, h2, p { margin: 0; }
+      h1 { font-size: 24px; }
+      header p { margin-top: 5px; color: #ffced2; font-weight: 700; }
+      .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; padding: 16px 22px; background: #f8f5ef; border-bottom: 1px solid #ded8ec; }
+      .meta div { display: grid; gap: 4px; padding: 10px; border: 1px solid #e3ddeb; border-radius: 8px; background: #fff; }
+      .meta span { color: #625b74; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+      .meta strong { font-size: 14px; }
+      section { padding: 18px 22px; }
+      section + section { border-top: 1px solid #ece7f3; }
+      h2 { margin-bottom: 12px; color: #2f2482; font-size: 18px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th { background: #171141; color: #fff; text-align: left; text-transform: uppercase; font-size: 10px; letter-spacing: .02em; }
+      th, td { border: 1px solid #ded8ec; padding: 8px; vertical-align: top; }
+      tbody tr:nth-child(even) { background: #faf8f4; }
+      .empty { color: #625b74; font-weight: 700; }
+      footer { padding: 12px 22px 18px; color: #625b74; font-size: 11px; text-align: center; }
+      @media print {
+        body { background: #fff; }
+        .actions { display: none; }
+        main { width: 100%; margin: 0; border: 0; border-radius: 0; }
+        section { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="actions"><button onclick="window.print()">Print / Save PDF</button></div>
+    <main>
+      <header>
+        <img src="/kfa-logo.png" alt="KFA logo">
+        <div><h1>${escapeHtml(title)}</h1><p>${escapeHtml(subtitle)}</p></div>
+      </header>
+      <div class="meta">
+        ${meta.map((item) => `<div><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`).join('')}
+        <div><span>Generated</span><strong>${escapeHtml(new Date().toLocaleString('en-IN'))}</strong></div>
+      </div>
+      ${sectionHtml}
+      <footer>KFA Music Academy | Computer-generated report</footer>
+    </main>
+  </body>
+  </html>`
+
+  const win = window.open('', '_blank')
+  win.document.write(html)
+  win.document.close()
+}
+
+function PrintReportsView({ data, optionSets }) {
+  const [gradeExamId, setGradeExamId] = useState(data.grade_exams[0]?.id || '')
+  const [classId, setClassId] = useState('')
+  const [branchId, setBranchId] = useState('')
+  const [eventProgramId, setEventProgramId] = useState((data.event_programs || [])[0]?.id || '')
+  const selectedExam = data.grade_exams.find((exam) => String(exam.id) === String(gradeExamId))
+  const selectedClass = data.classes.find((item) => String(item.id) === String(classId))
+  const selectedBranch = data.branches.find((item) => String(item.id) === String(branchId))
+  const selectedProgram = (data.event_programs || []).find((item) => String(item.id) === String(eventProgramId))
+
+  const gradeRows = (data.student_academics || [])
+    .filter((row) => !selectedExam || Number(row.grade_id) === Number(selectedExam.grade_id))
+    .filter((row) => !branchId || Number(row.branch_id) === Number(branchId))
+    .filter((row) => {
+      if (!selectedClass) return true
+      return (data.enrollments || []).some((enrollment) => Number(enrollment.student_id) === Number(row.student_id) && Number(enrollment.course_id) === Number(selectedClass.course_id))
+    })
+    .map((row) => {
+      const student = data.students.find((item) => Number(item.id) === Number(row.student_id))
+      const result = (data.academic_results || []).find((item) => Number(item.student_id) === Number(row.student_id) && Number(item.grade_exam_id) === Number(gradeExamId))
+      return { ...row, student_name: student?.name || row.student_name, phone: student?.phone, parent_name: student?.parent_name, marks: result?.marks, result_grade: result?.grade, result_status: result?.result_status }
+    })
+
+  function printGradeExam() {
+    openPrintableReport({
+      title: 'Grade Exam Student List',
+      subtitle: 'Students allocated for selected grade exam',
+      meta: [
+        { label: 'Grade', value: selectedExam?.grade_name || 'All grade exams' },
+        { label: 'Exam Date', value: selectedExam?.exam_date || '-' },
+        { label: 'Class', value: selectedClass ? `${selectedClass.course_name} | ${selectedClass.day_of_week}` : 'All classes' },
+        { label: 'Branch', value: selectedBranch?.branch_name || 'All branches' },
+        { label: 'Total Students', value: gradeRows.length },
+      ],
+      sections: [{
+        title: 'Student List',
+        rows: gradeRows,
+        columns: [
+          { label: 'S.No', render: (_row, index) => index + 1 },
+          { label: 'Student Name', key: 'student_name' },
+          { label: 'Parent', key: 'parent_name' },
+          { label: 'Phone', key: 'phone' },
+          { label: 'Branch', key: 'branch_name' },
+          { label: 'Program', key: 'program_name' },
+          { label: 'Grade', key: 'grade_name' },
+          { label: 'Marks', key: 'marks' },
+          { label: 'Result Grade', key: 'result_grade' },
+          { label: 'Status', key: 'result_status' },
+        ],
+      }],
+    })
+  }
+
+  function printProgramDetails() {
+    const participants = (data.event_program_participants || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    const items = (data.event_program_items || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    const teams = (data.event_program_teams || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    const charges = (data.event_program_charges || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    openPrintableReport({
+      title: 'Program Details Report',
+      subtitle: selectedProgram?.program_name || 'Selected event program',
+      meta: [
+        { label: 'Program', value: selectedProgram?.program_name || '-' },
+        { label: 'Date', value: selectedProgram?.event_date || '-' },
+        { label: 'Time', value: selectedProgram?.event_time || '-' },
+        { label: 'Venue', value: selectedProgram?.venue || '-' },
+        { label: 'Branch', value: selectedProgram?.branch_name || '-' },
+        { label: 'Status', value: selectedProgram?.status || '-' },
+      ],
+      sections: [
+        {
+          title: 'Program Items / Songs',
+          rows: items,
+          columns: [{ label: 'Order', key: 'display_order' }, { label: 'Category', key: 'category' }, { label: 'Item / Song', key: 'item_title' }, { label: 'Notes', key: 'item_notes' }],
+        },
+        {
+          title: 'Teams',
+          rows: teams,
+          columns: [{ label: 'Team', key: 'team_name' }, { label: 'Staff Incharge', key: 'staff_name' }, { label: 'Notes', key: 'team_notes' }],
+        },
+        {
+          title: 'Participants',
+          rows: participants,
+          columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, { label: 'Student', key: 'student_name' }, { label: 'Team', key: 'team_name' }, { label: 'Class', key: 'course_name' }, { label: 'Branch', key: 'branch_name' }, { label: 'Grade', key: 'grade_name' }, { label: 'Role', key: 'role_name' }, { label: 'Status', key: 'participation_status' }],
+        },
+        {
+          title: 'Charges',
+          rows: charges,
+          columns: [{ label: 'Student', key: 'student_name' }, { label: 'Charge Type', key: 'charge_type' }, { label: 'Amount', key: 'amount' }, { label: 'Paid', key: 'paid_amount' }, { label: 'Due', key: 'due_amount' }, { label: 'Status', key: 'status' }, { label: 'Notes', key: 'notes' }],
+        },
+      ],
+    })
+  }
+
+  return (
+    <div className="dashboard-grid">
+      <section className="panel form-grid">
+        <h3>Grade Exam Print / PDF</h3>
+        <label className="field-control">
+          <span>Grade Exam</span>
+          <select value={gradeExamId} onChange={(event) => setGradeExamId(event.target.value)}>
+            <option value="">All Grade Exams</option>
+            {optionSets.gradeExams.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="field-control">
+          <span>Class</span>
+          <select value={classId} onChange={(event) => setClassId(event.target.value)}>
+            <option value="">All Classes</option>
+            {optionSets.classes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="field-control">
+          <span>Branch</span>
+          <select value={branchId} onChange={(event) => setBranchId(event.target.value)}>
+            <option value="">All Branches</option>
+            {optionSets.branches.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <button type="button" className="primary" onClick={printGradeExam}>Print / Save PDF</button>
+        <p className="hint">{gradeRows.length} students found for this selection.</p>
+      </section>
+      <section className="panel form-grid">
+        <h3>Program Details Print / PDF</h3>
+        <label className="field-control">
+          <span>Program</span>
+          <select value={eventProgramId} onChange={(event) => setEventProgramId(event.target.value)}>
+            <option value="">Select Program</option>
+            {optionSets.eventPrograms.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <button type="button" className="primary" onClick={printProgramDetails} disabled={!eventProgramId}>Print / Save PDF</button>
+        <p className="hint">Includes program info, items, teams, participants, and charges.</p>
+      </section>
+      <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />
+    </div>
+  )
+}
+
 function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', media_type: 'photo', class_id: '', file: null, media_url: '', thumbnail_url: '' })
@@ -596,7 +861,7 @@ function MediaManager({ data, optionSets, addRecord, updateRecord, deleteRecord 
   )
 }
 
-export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, updateSiteContent, sidebarOpen, setSidebarOpen }) {
+export default function AdminDashboard({ data, addRecord, updateRecord, deleteRecord, updateSiteContent, importStudents, sidebarOpen, setSidebarOpen }) {
   const [activePage, setActivePage] = useState('overview')
   const workspaceRef = useRef(null)
   const stats = [
@@ -641,6 +906,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     chargeTypes: ['program fee', 'vehicle charge', 'costume charge', 'food charge', 'specific charge', 'other'].map((type) => ({ value: type, label: type })),
     feeStatuses: ['pending', 'partial', 'paid'].map((status) => ({ value: status, label: status })),
     studentAccountStatuses: ['pending', 'active', 'inactive'].map((status) => ({ value: status, label: status })),
+    notificationRoles: ['all', 'admin', 'staff', 'student'].map((role) => ({ value: role, label: role })),
   }
 
   const adminPages = useMemo(() => [
@@ -665,7 +931,9 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     { id: 'event-participants', label: 'Participants', detail: 'Student teams' },
     { id: 'event-charges', label: 'Program Charges', detail: 'Fees and vehicle' },
     { id: 'event-reports', label: 'Program Reports', detail: 'Filtered dues' },
+    { id: 'print-reports', label: 'Print Reports', detail: 'Exam and program PDF' },
     { id: 'attendance', label: 'Attendance', detail: 'Class attendance' },
+    { id: 'notifications', label: 'Notifications', detail: 'Messages' },
     { id: 'enquiries', label: 'Enquiries', detail: 'Lead follow-up' },
   ], [])
 
@@ -744,32 +1012,35 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
           )}
 
           {activePage === 'students' && (
-            <ManagedSection
-              type="students"
-              title="Add Student"
-              fields={[
-                { name: 'name', label: 'Student Name' },
-                { name: 'dob', label: 'DOB', type: 'date' },
-                { name: 'email', label: 'Email', type: 'email', required: false },
-                { name: 'phone', label: 'Phone', required: false },
-                { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches },
-                { name: 'admission_date', label: 'Admission Date', type: 'date' },
-                { name: 'parent_name', label: 'Parent Name' },
-                { name: 'photo_url', label: 'Student Photo', type: 'file', uploadPath: '/uploads/student-photos', required: false },
-                { name: 'account_status', label: 'Login Access', type: 'select', options: optionSets.studentAccountStatuses, required: false },
-                { name: 'program_id', label: 'Non-Exam Program', type: 'select', options: optionSets.programs, required: false },
-                { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades, required: false },
-                { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
-                { name: 'start_date', label: 'Academic Start Date', type: 'date', required: false },
-                { name: 'status', label: 'Academic Status', type: 'select', options: optionSets.statuses, required: false },
-              ]}
-              rows={data.students}
-              columns={['name', 'branch_name', 'dob', 'email', 'phone', 'account_status', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
-              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }]}
-              addRecord={addRecord}
-              updateRecord={updateRecord}
-              deleteRecord={deleteRecord}
-            />
+            <>
+              <StudentImportPanel importStudents={importStudents} />
+              <ManagedSection
+                type="students"
+                title="Add Student"
+                fields={[
+                  { name: 'name', label: 'Student Name' },
+                  { name: 'dob', label: 'DOB', type: 'date' },
+                  { name: 'email', label: 'Email', type: 'email', required: false },
+                  { name: 'phone', label: 'Phone', required: false },
+                  { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches },
+                  { name: 'admission_date', label: 'Admission Date', type: 'date' },
+                  { name: 'parent_name', label: 'Parent Name' },
+                  { name: 'photo_url', label: 'Student Photo', type: 'file', uploadPath: '/uploads/student-photos', required: false },
+                  { name: 'account_status', label: 'Login Access', type: 'select', options: optionSets.studentAccountStatuses, required: false },
+                  { name: 'program_id', label: 'Non-Exam Program', type: 'select', options: optionSets.programs, required: false },
+                  { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades, required: false },
+                  { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
+                  { name: 'start_date', label: 'Academic Start Date', type: 'date', required: false },
+                  { name: 'status', label: 'Academic Status', type: 'select', options: optionSets.statuses, required: false },
+                ]}
+                rows={data.students}
+                columns={['name', 'branch_name', 'dob', 'email', 'phone', 'account_status', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
+                filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }]}
+                addRecord={addRecord}
+                updateRecord={updateRecord}
+                deleteRecord={deleteRecord}
+              />
+            </>
           )}
 
           {activePage === 'staff' && (
@@ -1091,8 +1362,30 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
             <EventProgramReport data={data} optionSets={optionSets} />
           )}
 
+          {activePage === 'print-reports' && (
+            <PrintReportsView data={data} optionSets={optionSets} />
+          )}
+
           {activePage === 'attendance' && (
             <AttendanceView data={data} />
+          )}
+
+          {activePage === 'notifications' && (
+            <ManagedSection
+              type="notifications"
+              title="Add Notification"
+              fields={[
+                { name: 'title', label: 'Title' },
+                { name: 'message', label: 'Message', type: 'textarea' },
+                { name: 'role', label: 'Send To', type: 'select', options: optionSets.notificationRoles },
+              ]}
+              rows={data.notifications}
+              columns={['title', 'message', 'role', 'created_at']}
+              filters={[{ name: 'role', label: 'Send To', options: optionSets.notificationRoles }]}
+              addRecord={addRecord}
+              updateRecord={updateRecord}
+              deleteRecord={deleteRecord}
+            />
           )}
 
           {activePage === 'enquiries' && (

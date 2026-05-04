@@ -251,11 +251,24 @@ function App() {
     notify('Site content updated successfully.')
   }
 
+  async function importStudents(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const result = await api('/students/import', { method: 'POST', body: formData })
+    await refreshDashboardData()
+    notify(`Imported ${result.created} students. Skipped ${result.skipped}.`)
+    return result
+  }
+
   function markAttendance(record) {
+    const classRow = data.classes.find((item) => Number(item.id) === Number(record.class_id))
     addRecord('attendance', {
       ...record,
       student_name: data.students.find((student) => Number(student.id) === Number(record.student_id))?.name || 'Student',
-      course_name: data.classes.find((item) => Number(item.id) === Number(record.class_id))?.course_name || 'Class',
+      course_name: classRow?.course_name || 'Class',
+      branch_name: classRow?.branch_name,
+      day_of_week: record.day_of_week || classRow?.day_of_week || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
+      attendance_time: record.attendance_time || classRow?.start_time || new Date().toTimeString().slice(0, 5),
     })
   }
 
@@ -280,7 +293,7 @@ function App() {
       {visiblePage === 'register-student' && <RegisterStudent branches={data.branches} onRegister={handleStudentRegister} navigate={navigate} />}
       {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
       {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} navigate={navigate} />}
-      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}

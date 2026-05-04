@@ -87,6 +87,8 @@ async function migrate() {
   await addColumn('fees', 'fee_frequency', "VARCHAR(20) DEFAULT 'monthly'")
   await addColumn('fees', 'billing_day', 'INT NULL')
   await addColumn('fees', 'due_day', 'INT NULL')
+  await addColumn('attendance', 'day_of_week', 'VARCHAR(20) NULL')
+  await addColumn('attendance', 'attendance_time', 'TIME NULL')
 
   await query('ALTER TABLE fees MODIFY status VARCHAR(20) NULL')
 

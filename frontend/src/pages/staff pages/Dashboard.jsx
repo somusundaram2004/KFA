@@ -39,7 +39,14 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
 
   function setAttendance(studentId, status) {
     const existing = attendanceFor(studentId)
-    const record = { student_id: studentId, class_id: selectedClassId, date: attendanceDate, status }
+    const record = {
+      student_id: studentId,
+      class_id: selectedClassId,
+      date: attendanceDate,
+      day_of_week: selectedClass?.day_of_week || new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'long' }),
+      attendance_time: selectedClass?.start_time || new Date().toTimeString().slice(0, 5),
+      status,
+    }
     if (existing) {
       updateRecord('attendance', existing.id, record)
       return
@@ -116,12 +123,13 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
           <button className="primary">Send</button>
         </form>
       </div>
-      <DataSection title="Class Attendance History" rows={classAttendance} columns={['student_name', 'course_name', 'date', 'status']} />
+      <DataSection title="Class Attendance History" rows={classAttendance} columns={['student_name', 'course_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
       <DataSection title="Assigned Classes" rows={classes} columns={['course_name', 'branch_name', 'day_of_week', 'start_time', 'end_time']} />
       <DataSection title="Assigned Event Programs" rows={eventPrograms} columns={['program_name', 'event_date', 'event_time', 'venue', 'branch_name', 'status']} />
       <DataSection title="My Program Teams" rows={eventTeams} columns={['program_name', 'team_name', 'team_notes']} />
       <DataSection title="Program Song / Item Lists" rows={eventItems} columns={['program_name', 'category', 'item_title', 'item_notes', 'display_order']} />
       <DataSection title="Program Participants" rows={eventParticipants} columns={['program_name', 'student_name', 'team_name', 'course_name', 'branch_name', 'grade_name', 'role_name', 'participation_status', 'notes']} />
+      <DataSection title="Notifications" rows={notifications.filter((item) => ['staff', 'all'].includes(item.role))} columns={['title', 'message', 'created_at']} />
     </DashboardFrame>
   )
 }

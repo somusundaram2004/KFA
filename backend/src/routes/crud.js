@@ -1,11 +1,13 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import multer from 'multer'
 import { query } from '../db.js'
 import { requireAuth, allowRoles } from '../middleware/auth.js'
-import { ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureAttendanceDetailColumns, ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler, dobToPassword, pick } from '../utils.js'
 
 const router = Router()
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 
 const tables = {
   branches: ['branch_name', 'location', 'phone'],
@@ -15,7 +17,7 @@ const tables = {
   courses: ['course_name', 'description', 'duration', 'fees'],
   classes: ['course_id', 'staff_id', 'branch_id', 'day_of_week', 'start_time', 'end_time'],
   enrollments: ['student_id', 'course_id', 'enrollment_date'],
-  attendance: ['student_id', 'class_id', 'date', 'status'],
+  attendance: ['student_id', 'class_id', 'date', 'day_of_week', 'attendance_time', 'status'],
   fees: ['student_id', 'branch_id', 'fee_type', 'course_id', 'program_id', 'grade_id', 'university_program_id', 'total_amount', 'paid_amount', 'due_amount', 'status', 'fee_frequency', 'billing_day', 'due_day'],
   payments: ['fee_id', 'amount', 'payment_date'],
   enquiries: ['name', 'phone', 'email', 'course_interested', 'message'],
@@ -45,6 +47,103 @@ function updateSql(table, fields) {
   return `UPDATE ${table} SET ${fields.map((field) => `${field} = ?`).join(', ')} WHERE id = ?`
 }
 
+function normalizeImportKey(key) {
+  return String(key || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+}
+
+function normalizeImportRow(row) {
+  const aliases = {
+    student_name: 'name',
+    full_name: 'name',
+    date_of_birth: 'dob',
+    birth_date: 'dob',
+    mobile: 'phone',
+    mobile_number: 'phone',
+    parent: 'parent_name',
+    father_name: 'parent_name',
+    mother_name: 'parent_name',
+    branch: 'branch_name',
+    login_access: 'account_status',
+    student_status: 'account_status',
+    academic_status: 'status',
+  }
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    const normalized = normalizeImportKey(key)
+    return [aliases[normalized] || normalized, typeof value === 'string' ? value.trim() : value]
+  }))
+}
+
+function parseCsv(buffer) {
+  const text = buffer.toString('utf8').replace(/^\uFEFF/, '')
+  const rows = []
+  let current = []
+  let cell = ''
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const next = text[index + 1]
+    if (char === '"' && quoted && next === '"') {
+      cell += '"'
+      index += 1
+    } else if (char === '"') {
+      quoted = !quoted
+    } else if (char === ',' && !quoted) {
+      current.push(cell)
+      cell = ''
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') index += 1
+      current.push(cell)
+      if (current.some((value) => value.trim())) rows.push(current)
+      current = []
+      cell = ''
+    } else {
+      cell += char
+    }
+  }
+  current.push(cell)
+  if (current.some((value) => value.trim())) rows.push(current)
+  const headers = rows.shift()?.map(normalizeImportKey) || []
+  return rows.map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] || ''])))
+}
+
+async function parseStudentImport(file) {
+  const extension = file.originalname.split('.').pop()?.toLowerCase()
+  if (extension === 'csv') return parseCsv(file.buffer)
+  try {
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    return XLSX.utils.sheet_to_json(sheet, { defval: '' })
+  } catch (error) {
+    throw new Error(`Excel parser is not installed. Run npm install in backend and try again. ${error.message}`)
+  }
+}
+
+function excelSerialToDate(value) {
+  const date = new Date(Math.round((Number(value) - 25569) * 86400 * 1000))
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
+}
+
+function normalizeDateValue(value) {
+  if (!value) return ''
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  if (typeof value === 'number') return excelSerialToDate(value)
+  const text = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
+  const slash = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (slash) return `${slash[3]}-${slash[2].padStart(2, '0')}-${slash[1].padStart(2, '0')}`
+  const parsed = new Date(text)
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10)
+}
+
+async function branchIdFromRow(row, branches) {
+  if (row.branch_id) return row.branch_id
+  if (!row.branch_name) return null
+  const match = branches.find((branch) => branch.branch_name?.toLowerCase() === String(row.branch_name).toLowerCase())
+  return match?.id || null
+}
+
 router.post('/class_media', asyncHandler(async (req, res) => {
   const fields = tables.class_media
   const body = pick(req.body, fields)
@@ -68,6 +167,7 @@ router.use(requireAuth)
 
 router.use(asyncHandler(async (_req, _res, next) => {
   await ensureEventProgramTables()
+  await ensureAttendanceDetailColumns()
   next()
 }))
 
@@ -415,6 +515,48 @@ router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
     }
   }
   res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, start_date, status })
+}))
+
+router.post('/students/import', adminOnly, importUpload.single('file'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'Excel file is required.' })
+  await ensurePersonPhotoColumns()
+  const rawRows = await parseStudentImport(req.file)
+  const branches = await query('SELECT id, branch_name FROM branches')
+  const summary = { total: rawRows.length, created: 0, skipped: 0, errors: [] }
+
+  for (const [index, rawRow] of rawRows.entries()) {
+    const rowNumber = index + 2
+    const row = normalizeImportRow(rawRow)
+    const name = row.name || ''
+    const dob = normalizeDateValue(row.dob)
+
+    if (!name || !dob) {
+      summary.skipped += 1
+      summary.errors.push({ row: rowNumber, reason: 'Missing name or dob' })
+      continue
+    }
+
+    const existing = await query('SELECT id FROM users WHERE LOWER(name) = LOWER(?) AND dob = ? LIMIT 1', [name, dob])
+    if (existing[0]) {
+      summary.skipped += 1
+      summary.errors.push({ row: rowNumber, reason: 'Student already exists' })
+      continue
+    }
+
+    const branchId = await branchIdFromRow(row, branches)
+    const password = await bcrypt.hash(dobToPassword(dob), 10)
+    const userResult = await query(
+      'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, dob, password, 'student', row.email || null, row.phone || null, branchId],
+    )
+    await query(
+      'INSERT INTO students (user_id, admission_date, parent_name, branch_id, photo_url, account_status) VALUES (?, ?, ?, ?, ?, ?)',
+      [userResult.insertId, normalizeDateValue(row.admission_date) || new Date().toISOString().slice(0, 10), row.parent_name || null, branchId, row.photo_url || null, row.account_status || 'active'],
+    )
+    summary.created += 1
+  }
+
+  res.status(201).json(summary)
 }))
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {

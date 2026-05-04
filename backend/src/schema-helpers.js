@@ -3,6 +3,7 @@ import { query } from './db.js'
 let personPhotoColumnsReady
 let siteContentTableReady
 let eventProgramTablesReady
+let attendanceDetailColumnsReady
 
 async function hasColumn(table, column) {
   const rows = await query('SELECT COUNT(*) total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [table, column])
@@ -57,6 +58,20 @@ export async function ensureFeeScheduleColumns() {
   if (!(await hasColumn('fees', 'due_day'))) {
     await query('ALTER TABLE fees ADD COLUMN due_day INT NULL')
   }
+}
+
+export async function ensureAttendanceDetailColumns() {
+  if (!attendanceDetailColumnsReady) {
+    attendanceDetailColumnsReady = (async () => {
+      if (!(await hasColumn('attendance', 'day_of_week'))) {
+        await query('ALTER TABLE attendance ADD COLUMN day_of_week VARCHAR(20) NULL')
+      }
+      if (!(await hasColumn('attendance', 'attendance_time'))) {
+        await query('ALTER TABLE attendance ADD COLUMN attendance_time TIME NULL')
+      }
+    })()
+  }
+  return attendanceDetailColumnsReady
 }
 
 export async function ensureEventProgramTables() {

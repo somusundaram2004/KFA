@@ -22,8 +22,8 @@ export const seed = {
   ],
   enrollments: [{ id: 1, student_id: 1, student_name: 'Rahul Nair', course_id: 1, course_name: 'Carnatic Vocals', enrollment_date: '2026-04-01' }],
   attendance: [
-    { id: 1, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-22', status: 'present' },
-    { id: 2, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-24', status: 'absent' },
+    { id: 1, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-22', day_of_week: 'Monday', attendance_time: '17:00', status: 'present' },
+    { id: 2, student_id: 1, student_name: 'Rahul Nair', class_id: 1, course_name: 'Carnatic Vocals', date: '2026-04-24', day_of_week: 'Monday', attendance_time: '17:00', status: 'absent' },
   ],
   fees: [{ id: 1, student_id: 1, student_name: 'Rahul Nair', branch_id: 1, branch_name: 'KFA Madambakkam Branch', fee_type: 'course', course_id: 1, course_name: 'Carnatic Vocals', total_amount: 18000, paid_amount: 0, due_amount: 18000, fee_frequency: 'monthly', billing_day: 1, due_day: 10, status: 'pending' }],
   payments: [],

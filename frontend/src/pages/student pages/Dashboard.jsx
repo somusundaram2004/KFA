@@ -34,9 +34,19 @@ export default function StudentDashboard({ data, session }) {
   const eventParticipants = data.event_program_participants || []
   const eventCharges = data.event_program_charges || []
   const notifications = data.notifications || []
+  const hasAcademicPrograms = academics.length > 0
+  const hasFees = fees.length > 0
+  const hasEventDetails = eventPrograms.length || eventParticipants.length || eventItems.length || eventCharges.length
+  const hasResults = results.length > 0
   const present = attendance.filter((item) => item.status === 'present').length
   const percentage = attendance.length ? Math.round((present / attendance.length) * 100) : 0
   const due = fees.reduce((sum, fee) => sum + Number(fee.due_amount || 0), 0) + eventCharges.reduce((sum, charge) => sum + Number(charge.due_amount || 0), 0)
+  const stats = [
+    hasAcademicPrograms && ['Academic Programs', academics.length],
+    hasEventDetails && ['Event Programs', eventPrograms.length],
+    ['Total Due', `Rs. ${due.toLocaleString('en-IN')}`],
+    hasResults && ['Results', results.length],
+  ].filter(Boolean)
 
   return (
     <DashboardFrame title="Student Dashboard" role={session.name}>
@@ -52,7 +62,7 @@ export default function StudentDashboard({ data, session }) {
           <small>{student?.phone || student?.email || 'Contact details not set'}</small>
         </div>
       </section>
-      <StatGrid stats={[['Academic Programs', academics.length], ['Event Programs', eventPrograms.length], ['Total Due', `Rs. ${due.toLocaleString('en-IN')}`], ['Results', results.length]]} />
+      <StatGrid stats={stats} />
       <div className="student-progress">
         <div>
           <span>Attendance Progress</span>
@@ -60,10 +70,12 @@ export default function StudentDashboard({ data, session }) {
         </div>
         <div className="progress-track"><span style={{ width: `${percentage}%` }}></span></div>
       </div>
-      <div className="dashboard-grid">
-        <DataSection compact title="My Academic Program" rows={academics} columns={['program_name', 'grade_name', 'university_program_name', 'start_date', 'status']} />
-        <DataSection compact title="My Fees" rows={fees} columns={['fee_type', 'total_amount', 'paid_amount', 'due_amount', 'fee_show_date', 'monthly_due_date', 'status']} />
-      </div>
+      {(hasAcademicPrograms || hasFees) && (
+        <div className="dashboard-grid">
+          {hasAcademicPrograms && <DataSection compact title="My Academic Program" rows={academics} columns={['program_name', 'grade_name', 'university_program_name', 'start_date', 'status']} />}
+          {hasFees && <DataSection compact title="My Fees" rows={fees} columns={['fee_type', 'total_amount', 'paid_amount', 'due_amount', 'fee_show_date', 'monthly_due_date', 'status']} />}
+        </div>
+      )}
       {!fees.length && <section className="table-section empty-state-panel"><h3>No Fees Assigned</h3><p className="empty">Your fee details will appear here when admin assigns monthly or program fees.</p></section>}
       {!!paidReceipts.length && (
         <section className="table-section">
@@ -83,12 +95,16 @@ export default function StudentDashboard({ data, session }) {
           </div>
         </section>
       )}
-      <DataSection title="Attendance" rows={attendance} columns={['course_name', 'branch_name', 'date', 'status']} />
-      <DataSection title="My Event Programs" rows={eventPrograms} columns={['program_name', 'event_date', 'event_time', 'venue', 'branch_name', 'status']} />
-      <DataSection title="My Program Team / Role" rows={eventParticipants} columns={['program_name', 'team_name', 'course_name', 'branch_name', 'grade_name', 'role_name', 'participation_status', 'notes']} />
-      <DataSection title="Program Song / Item Lists" rows={eventItems} columns={['program_name', 'category', 'item_title', 'item_notes', 'display_order']} />
-      <DataSection title="Program Charges" rows={eventCharges} columns={['program_name', 'charge_type', 'amount', 'paid_amount', 'due_amount', 'status', 'notes']} />
-      <DataSection title="Results" rows={results} columns={['grade_name', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']} />
+      {!!attendance.length && <DataSection title="Attendance" rows={attendance} columns={['course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />}
+      {!!hasEventDetails && (
+        <>
+          {!!eventPrograms.length && <DataSection title="My Event Programs" rows={eventPrograms} columns={['program_name', 'event_date', 'event_time', 'venue', 'branch_name', 'status']} />}
+          {!!eventParticipants.length && <DataSection title="My Program Team / Role" rows={eventParticipants} columns={['program_name', 'team_name', 'course_name', 'branch_name', 'grade_name', 'role_name', 'participation_status', 'notes']} />}
+          {!!eventItems.length && <DataSection title="Program Song / Item Lists" rows={eventItems} columns={['program_name', 'category', 'item_title', 'item_notes', 'display_order']} />}
+          {!!eventCharges.length && <DataSection title="Program Charges" rows={eventCharges} columns={['program_name', 'charge_type', 'amount', 'paid_amount', 'due_amount', 'status', 'notes']} />}
+        </>
+      )}
+      {hasResults && <DataSection title="Results" rows={results} columns={['grade_name', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']} />}
       <DataSection title="Notifications" rows={notifications.filter((item) => ['student', 'all'].includes(item.role))} columns={['title', 'message', 'created_at']} />
     </DashboardFrame>
   )

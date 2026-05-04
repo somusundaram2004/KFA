@@ -1731,6 +1731,44 @@ select {
   box-shadow: 0 0 0 4px rgba(31, 168, 85, 0.14);
 }
 
+.student-import-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.7fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 18px;
+  background:
+    linear-gradient(135deg, rgba(47, 36, 130, 0.07), rgba(237, 0, 18, 0.06)),
+    rgba(255, 255, 255, 0.94);
+}
+
+.student-import-panel h3,
+.student-import-panel p {
+  margin-bottom: 6px;
+}
+
+.import-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(31, 168, 85, 0.08);
+  color: #171141;
+  font-weight: 800;
+}
+
+.import-summary strong {
+  color: #13783c;
+}
+
+.import-summary small {
+  width: 100%;
+  color: #6b6174;
+}
+
 .compact-control {
   min-width: 190px;
 }
@@ -2732,6 +2770,11 @@ th {
   .admin-workspace .table-section {
     padding: 14px;
     margin-bottom: 12px;
+  }
+
+  .student-import-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .branch-location-card,
