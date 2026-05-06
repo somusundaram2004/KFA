@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AnimatedBackground from './components/AnimatedBackground'
 import Header from './components/Header'
+import LoadingOverlay from './components/LoadingOverlay'
 import { API_ORIGIN, api, dobPassword } from './utils/api'
 import { getStore, saveStore } from './utils/storage'
 import Landing from './pages/public/Landing'
@@ -13,11 +14,34 @@ import StudentDashboard from './pages/student pages/Dashboard'
 import AccessDenied from './pages/AccessDenied'
 import './App.css'
 
+function tokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.exp ? payload.exp * 1000 <= Date.now() : false
+  } catch {
+    return true
+  }
+}
+
+function storedSession() {
+  const token = localStorage.getItem('kfa_token')
+  const session = JSON.parse(localStorage.getItem('kfa_session') || 'null')
+
+  if (!session || !token || tokenExpired(token)) {
+    localStorage.removeItem('kfa_token')
+    localStorage.removeItem('kfa_session')
+    return null
+  }
+
+  return session
+}
+
 function App() {
   const [page, setPage] = useState(location.hash.replace('#', '') || 'home')
   const [data, setData] = useState(getStore)
-  const [session, setSession] = useState(() => JSON.parse(localStorage.getItem('kfa_session') || 'null'))
+  const [session, setSession] = useState(storedSession)
   const [toast, setToast] = useState('')
+  const [loadingMessage, setLoadingMessage] = useState('Preparing KFA...')
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -39,7 +63,47 @@ function App() {
         updateData((current) => ({ ...current, courses, branches, classes, class_media: classMedia, staff, site_content: siteContent }))
       })
       .catch(() => {})
+      .finally(() => setLoadingMessage(''))
   }, [])
+
+  useEffect(() => {
+    if (!session) return
+
+    let cancelled = false
+
+    async function loadSessionDashboard() {
+      setLoadingMessage('Loading dashboard...')
+      try {
+        const dashboard = await api('/me/dashboard')
+        if (cancelled) return
+        setData((current) => {
+          const next = { ...current, ...dashboard }
+          saveStore(next)
+          return next
+        })
+      } catch (error) {
+        if (!cancelled && error.status === 401) {
+          setSession(null)
+          setToast('Your login expired. Please sign in again.')
+          setTimeout(() => setToast(''), 3200)
+          setAdminMenuOpen(false)
+          location.hash = 'login'
+          setPage('login')
+          scrollTo({ top: 0, behavior: 'smooth' })
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingMessage('')
+        }
+      }
+    }
+
+    loadSessionDashboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [session])
 
   function navigate(next) {
     setAdminMenuOpen(false)
@@ -61,12 +125,17 @@ function App() {
     setTimeout(() => setToast(''), 3200)
   }
 
-  async function refreshDashboardData() {
+  async function refreshDashboardData(message = 'Loading dashboard...') {
     if (!localStorage.getItem('kfa_token')) {
       throw new Error('Login token is missing. Please sign in again.')
     }
-    const dashboard = await api('/me/dashboard')
-    updateData((current) => ({ ...current, ...dashboard }))
+    setLoadingMessage(message)
+    try {
+      const dashboard = await api('/me/dashboard')
+      updateData((current) => ({ ...current, ...dashboard }))
+    } finally {
+      setLoadingMessage('')
+    }
   }
 
   function withDisplayFields(record, source) {
@@ -141,6 +210,7 @@ function App() {
 
   async function handleLogin({ name, password, roleScope }) {
     console.log('[LOGIN UI] Submit', { name, roleScope, passwordLength: password.length })
+    setLoadingMessage('Signing in...')
     try {
       const result = await api('/auth/login', { method: 'POST', body: JSON.stringify({ name, password }) })
       console.log('[LOGIN UI] API login success', result.user)
@@ -157,17 +227,6 @@ function App() {
       localStorage.setItem('kfa_token', result.token)
       localStorage.setItem('kfa_session', JSON.stringify(result.user))
       setSession(result.user)
-      try {
-        await refreshDashboardData()
-      } catch (dashboardError) {
-        console.warn('[LOGIN UI] Dashboard fetch failed, keeping local data', dashboardError)
-        if (dashboardError.status === 401) {
-          setSession(null)
-          notify('Your login expired. Please sign in again.')
-          navigate('login')
-          return
-        }
-      }
       navigate(`${result.user.role}-dashboard`)
       return
     } catch (error) {
@@ -186,6 +245,8 @@ function App() {
       localStorage.setItem('kfa_session', JSON.stringify(user))
       setSession(user)
       navigate(`${user.role}-dashboard`)
+    } finally {
+      setLoadingMessage('')
     }
   }
 
@@ -294,6 +355,7 @@ function App() {
   return (
     <div className="app-shell">
       <AnimatedBackground />
+      {loadingMessage && <LoadingOverlay message={loadingMessage} />}
       {toast && <div className="toast">{toast}</div>}
       <Header
         session={session}
