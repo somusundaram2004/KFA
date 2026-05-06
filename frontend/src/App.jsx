@@ -126,11 +126,14 @@ function App() {
       api('/public/branches'),
       api('/public/classes'),
       api('/public/class-media'),
+      api('/public/gallery'),
       api('/public/staff'),
+      api('/public/announcements'),
+      api('/public/events'),
       api('/public/site-content'),
     ])
-      .then(([courses, branches, classes, classMedia, staff, siteContent]) => {
-        updateData((current) => ({ ...current, courses, branches, classes, class_media: classMedia, staff, site_content: siteContent }))
+      .then(([courses, branches, classes, classMedia, gallery, staff, announcements, publicEvents, siteContent]) => {
+        updateData((current) => ({ ...current, courses, branches, classes, class_media: classMedia, gallery, staff, announcements, public_events: publicEvents, site_content: siteContent }))
       })
       .catch(() => {})
       .finally(() => setLoadingMessage(''))

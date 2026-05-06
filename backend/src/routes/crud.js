@@ -525,7 +525,10 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, start_date, status } = req.body
+  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, status } = req.body
+  const dob = normalizeDateValue(req.body.dob)
+  const admission_date = normalizeDateValue(req.body.admission_date)
+  const start_date = normalizeDateValue(req.body.start_date)
   const password = await bcrypt.hash(dobToPassword(dob), 10)
   const userResult = await query(
     'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -546,7 +549,10 @@ router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
 
 router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, start_date, status } = req.body
+  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, status } = req.body
+  const dob = normalizeDateValue(req.body.dob)
+  const admission_date = normalizeDateValue(req.body.admission_date)
+  const start_date = normalizeDateValue(req.body.start_date)
   const studentRows = await query('SELECT user_id FROM students WHERE id = ?', [req.params.id])
   const userId = studentRows[0]?.user_id
   if (!userId) return res.status(404).json({ message: 'Student not found' })
@@ -604,7 +610,8 @@ router.post('/students/import/preview', adminOnly, importUpload.single('file'), 
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
+  const { name, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
+  const dob = normalizeDateValue(req.body.dob)
   const password = await bcrypt.hash(dobToPassword(dob), 10)
   const userResult = await query(
     'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -619,7 +626,8 @@ router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {
 
 router.put('/staff/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
+  const { name, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
+  const dob = normalizeDateValue(req.body.dob)
   const staffRows = await query('SELECT user_id FROM staff WHERE id = ?', [req.params.id])
   const userId = staffRows[0]?.user_id
   if (!userId) return res.status(404).json({ message: 'Staff not found' })

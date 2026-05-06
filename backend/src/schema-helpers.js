@@ -4,6 +4,7 @@ let personPhotoColumnsReady
 let siteContentTableReady
 let eventProgramTablesReady
 let attendanceDetailColumnsReady
+let galleryTableReady
 
 async function hasColumn(table, column) {
   const rows = await query('SELECT COUNT(*) total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [table, column])
@@ -49,6 +50,19 @@ export async function ensureSiteContentTable() {
     )
   }
   return siteContentTableReady
+}
+
+export async function ensureGalleryTable() {
+  if (!galleryTableReady) {
+    galleryTableReady = query(`CREATE TABLE IF NOT EXISTS gallery (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      image_url VARCHAR(500) NOT NULL,
+      public_id VARCHAR(255),
+      title VARCHAR(150),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+  }
+  return galleryTableReady
 }
 
 export async function ensureFeeScheduleColumns() {

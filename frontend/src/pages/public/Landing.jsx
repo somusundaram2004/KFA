@@ -46,6 +46,13 @@ function formatTime(value) {
   return `${displayHour}:${minute} ${suffix}`
 }
 
+function formatDate(value) {
+  if (!value) return 'Date to be announced'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Date to be announced'
+  return parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function courseLevel(courseName) {
   const name = courseName.toLowerCase()
   if (name.includes('dance')) return 'Kids, teens, and adults'
@@ -180,7 +187,12 @@ export default function Landing({ data, navigate, onEnquiry }) {
       courses: courses.length ? courses : ['Music', 'Dance', 'Instrument training'],
     }
   })
-  const galleryItems = (data.class_media || []).filter((item) => item.media_url)
+  const galleryItems = [
+    ...(data.gallery || []),
+    ...(data.class_media || []),
+  ].filter((item) => item.media_url)
+  const announcements = data.announcements || []
+  const publicEvents = data.public_events || []
   const categories = ['All', 'Vocal', 'Instrument', 'Dance']
   const featuredClasses = (data.classes || []).slice(0, 6)
   const visibleCourses = data.courses.filter((course) => {
@@ -220,6 +232,19 @@ export default function Landing({ data, navigate, onEnquiry }) {
         </div>
         <div className="hero-stat"><strong>{siteContent.heroStatNumber}</strong><span>{siteContent.heroStatLabel}</span></div>
       </section>
+      {!!announcements.length && (
+        <section className="announcement-strip" aria-label="Academy announcements">
+          <span>Latest Updates</span>
+          <div>
+            {announcements.map((item) => (
+              <article key={item.id}>
+                <strong>{item.title}</strong>
+                <p>{item.message}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="band about-grid">
         <div>
           <span className="eyebrow">{siteContent.aboutLabel}</span>
@@ -282,6 +307,23 @@ export default function Landing({ data, navigate, onEnquiry }) {
           ))}
         </div>
       </section>
+      {!!publicEvents.length && (
+        <section className="section upcoming-programs">
+          <SectionTitle label="Upcoming" title="Programs and academy events" />
+          <div className="event-program-grid">
+            {publicEvents.map((event) => (
+              <article key={event.id}>
+                <span>{formatDate(event.event_date)}</span>
+                <h3>{event.program_name}</h3>
+                {(event.event_time || event.venue || event.branch_name) && (
+                  <p>{[event.event_time, event.venue, event.branch_name].filter(Boolean).join(' | ')}</p>
+                )}
+                {event.description && <small>{event.description}</small>}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {!!galleryItems.length && (
         <section className="band">
           <SectionTitle label={siteContent.galleryLabel} title={siteContent.galleryTitle} />

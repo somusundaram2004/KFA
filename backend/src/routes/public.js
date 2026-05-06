@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureEventProgramTables, ensureGalleryTable, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler } from '../utils.js'
 
 const router = Router()
@@ -41,6 +41,27 @@ router.get('/staff', asyncHandler(async (_req, res) => {
      JOIN users u ON u.id = st.user_id
      LEFT JOIN branches b ON b.id = st.branch_id
      ORDER BY st.id DESC`,
+  ))
+}))
+
+router.get('/gallery', asyncHandler(async (_req, res) => {
+  await ensureGalleryTable()
+  res.json(await query("SELECT id, image_url media_url, title, created_at, 'photo' media_type FROM gallery ORDER BY created_at DESC, id DESC LIMIT 24"))
+}))
+
+router.get('/announcements', asyncHandler(async (_req, res) => {
+  res.json(await query("SELECT id, title, message, created_at FROM notifications WHERE role IN ('all', 'student') ORDER BY created_at DESC, id DESC LIMIT 5"))
+}))
+
+router.get('/events', asyncHandler(async (_req, res) => {
+  await ensureEventProgramTables()
+  res.json(await query(
+    `SELECT ep.*, b.branch_name
+     FROM event_programs ep
+     LEFT JOIN branches b ON b.id = ep.branch_id
+     WHERE COALESCE(ep.status, 'planning') <> 'cancelled'
+     ORDER BY ep.event_date IS NULL, ep.event_date ASC, ep.id DESC
+     LIMIT 6`,
   ))
 }))
 

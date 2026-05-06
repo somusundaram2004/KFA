@@ -32,6 +32,9 @@ export const seed = {
     { id: 1, title: 'May batch timetable', message: 'Updated evening practice slots are live.', role: 'all', created_at: '2026-04-27' },
   ],
   class_media: [],
+  gallery: [],
+  announcements: [],
+  public_events: [],
   programs: [
     { id: 1, program_name: 'Crayons', description: 'Creative foundation program for young learners', duration: '3 months', fees: 4500 },
     { id: 2, program_name: 'Oil Pastels', description: 'Color blending and artwork development program', duration: '4 months', fees: 6000 },

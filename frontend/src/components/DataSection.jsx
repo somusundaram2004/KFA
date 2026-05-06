@@ -5,6 +5,14 @@ export default function DataSection({ title, rows, columns, compact = false }) {
     ? columns.filter((column) => rows.some((row) => row[column] !== undefined && row[column] !== null && row[column] !== ''))
     : columns
 
+  function formatCell(column, value) {
+    if (value === undefined || value === null || value === '') return '-'
+    if (column === 'dob' || column.endsWith('_date') || column === 'date') {
+      return String(value).slice(0, 10)
+    }
+    return String(value)
+  }
+
   return (
     <section className={compact ? 'panel' : 'table-section'}>
       <h3>{title}</h3>
@@ -19,7 +27,7 @@ export default function DataSection({ title, rows, columns, compact = false }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  {visibleColumns.map((column) => <td key={column}>{String(row[column] ?? '-')}</td>)}
+                  {visibleColumns.map((column) => <td key={column}>{formatCell(column, row[column])}</td>)}
                 </tr>
               ))}
             </tbody>

@@ -10,6 +10,22 @@ function cleanRecord(record) {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, value === '' ? null : value]))
 }
 
+function formatDateValue(value) {
+  if (!value) return ''
+  return String(value).slice(0, 10)
+}
+
+function fieldValue(field, value) {
+  if (field.type === 'date') return formatDateValue(value)
+  return value ?? ''
+}
+
+function formatTableCell(column, value) {
+  if (value === undefined || value === null || value === '') return '-'
+  if (column === 'dob' || column.endsWith('_date') || column === 'date') return formatDateValue(value)
+  return String(value)
+}
+
 function mediaSrc(url) {
   if (!url) return ''
   if (url.startsWith('/uploads')) return `${API_ORIGIN}${url}`
@@ -64,14 +80,14 @@ function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
         <label className="field-control" key={field.name}>
           <span>{field.label}</span>
           {field.type === 'select' ? (
-            <select required={field.required !== false} value={form[field.name] ?? ''} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })}>
+            <select required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })}>
               <option value="">{field.placeholder || `Select ${field.label}`}</option>
               {(field.options || []).map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           ) : field.type === 'textarea' ? (
-            <textarea required={field.required !== false} value={form[field.name] ?? ''} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
+            <textarea required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
           ) : field.type === 'file' ? (
             <>
               <input type="file" accept={field.accept || 'image/*'} required={field.required !== false && !form[field.name]} onChange={(event) => uploadFieldFile(field, event.target.files?.[0])} />
@@ -84,7 +100,7 @@ function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
               )}
             </>
           ) : (
-            <input type={field.type || 'text'} required={field.required !== false} value={form[field.name] ?? ''} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
+            <input type={field.type || 'text'} required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
           )}
         </label>
       ))}
@@ -141,7 +157,7 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
               <tbody>
                 {visibleRows.map((row) => (
                   <tr key={row.id}>
-                    {columns.map((column) => <td key={column}>{String(row[column] ?? '-')}</td>)}
+                    {columns.map((column) => <td key={column}>{formatTableCell(column, row[column])}</td>)}
                     <td>
                       <div className="row-actions">
                         <button type="button" onClick={() => setEditing(row)}>Edit</button>
