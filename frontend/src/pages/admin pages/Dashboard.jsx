@@ -114,24 +114,22 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
   return (
     <>
       <AdminForm key={`${type}-${editing?.id || 'new'}`} title={title} fields={fields} initialRecord={editing} onSubmit={submit} onCancel={() => setEditing(null)} />
-      <section className="table-section">
-        <h3>{title.replace(/^Add /, '')}</h3>
-        {!!filters.length && (
-          <div className="filter-bar">
-            {filters.map((filter) => (
-              <label className="field-control" key={filter.name}>
-                <span>{filter.label}</span>
-                <select value={filterState[filter.name] || ''} onChange={(event) => setFilterState({ ...filterState, [filter.name]: event.target.value })}>
-                  <option value="">All</option>
-                  {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-            ))}
-          </div>
-        )}
-        {!visibleRows.length ? (
-          <p className="empty">No records yet.</p>
-        ) : (
+      {!!visibleRows.length && (
+        <section className="table-section">
+          <h3>{title.replace(/^Add /, '')}</h3>
+          {!!filters.length && (
+            <div className="filter-bar">
+              {filters.map((filter) => (
+                <label className="field-control" key={filter.name}>
+                  <span>{filter.label}</span>
+                  <select value={filterState[filter.name] || ''} onChange={(event) => setFilterState({ ...filterState, [filter.name]: event.target.value })}>
+                    <option value="">All</option>
+                    {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
           <div className="table-wrap">
             <table>
               <thead>
@@ -155,9 +153,58 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
     </>
+  )
+}
+
+function AccessManager({ title, rows, roleLabel, updateRecord }) {
+  async function setAccess(row, accountStatus) {
+    await updateRecord(roleLabel === 'Student' ? 'students' : 'staff', row.id, {
+      ...row,
+      account_status: accountStatus,
+    })
+  }
+
+  if (!rows.length) return null
+
+  return (
+    <section className="table-section">
+      <h3>{title}</h3>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{roleLabel}</th>
+              <th>Phone</th>
+              <th>Branch</th>
+              <th>Login Access</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const active = row.account_status === 'active'
+              return (
+                <tr key={row.id}>
+                  <td>{row.name}</td>
+                  <td>{row.phone || '-'}</td>
+                  <td>{row.branch_name || '-'}</td>
+                  <td><span className={active ? 'access-pill active' : 'access-pill inactive'}>{active ? 'Active' : 'Inactive'}</span></td>
+                  <td>
+                    <div className="row-actions">
+                      <button type="button" className={active ? '' : 'primary'} onClick={() => setAccess(row, 'active')}>Activate</button>
+                      <button type="button" onClick={() => setAccess(row, 'inactive')}>Inactivate</button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -973,7 +1020,9 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     { id: 'site-content', label: 'Site Content', detail: 'Homepage text' },
     { id: 'branches', label: 'Branches', detail: 'Locations' },
     { id: 'students', label: 'Students', detail: 'Student details' },
+    { id: 'manage-students', label: 'Manage Students', detail: 'Activate login' },
     { id: 'staff', label: 'Staff', detail: 'Faculty details' },
+    { id: 'manage-staff', label: 'Manage Staff', detail: 'Staff login access' },
     { id: 'courses', label: 'Courses', detail: 'Course fees' },
     { id: 'classes', label: 'Classes', detail: 'Branch timetable' },
     { id: 'media', label: 'Gallery', detail: 'Website photos' },
@@ -1102,6 +1151,15 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
             </>
           )}
 
+          {activePage === 'manage-students' && (
+            <AccessManager
+              title="Manage Student Login Access"
+              rows={data.students}
+              roleLabel="Student"
+              updateRecord={updateRecord}
+            />
+          )}
+
           {activePage === 'staff' && (
             <ManagedSection
               type="staff"
@@ -1116,13 +1174,23 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 { name: 'salary', label: 'Salary', type: 'number' },
                 { name: 'branch_id', label: 'Branch', type: 'select', options: optionSets.branches },
                 { name: 'photo_url', label: 'Teacher Photo', type: 'file', uploadPath: '/uploads/staff-photos', required: false },
+                { name: 'account_status', label: 'Login Access', type: 'select', options: optionSets.studentAccountStatuses, required: false },
               ]}
               rows={data.staff}
-              columns={['name', 'branch_name', 'specialization', 'bio', 'salary', 'email', 'phone', 'photo_url']}
-              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }]}
+              columns={['name', 'branch_name', 'specialization', 'bio', 'salary', 'email', 'phone', 'account_status', 'photo_url']}
+              filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }]}
               addRecord={addRecord}
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}
+            />
+          )}
+
+          {activePage === 'manage-staff' && (
+            <AccessManager
+              title="Manage Staff Login Access"
+              rows={data.staff}
+              roleLabel="Staff"
+              updateRecord={updateRecord}
             />
           )}
 

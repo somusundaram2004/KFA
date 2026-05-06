@@ -40,6 +40,7 @@ CREATE TABLE staff (
     specialization VARCHAR(100),
     salary DECIMAL(10,2),
     photo_url VARCHAR(500),
+    account_status VARCHAR(20) DEFAULT 'active',
     bio TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

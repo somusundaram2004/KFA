@@ -31,6 +31,9 @@ export async function ensurePersonPhotoColumns() {
       if (!(await hasColumn('staff', 'photo_url'))) {
         await query('ALTER TABLE staff ADD COLUMN photo_url VARCHAR(500) NULL')
       }
+      if (!(await hasColumn('staff', 'account_status'))) {
+        await query("ALTER TABLE staff ADD COLUMN account_status VARCHAR(20) DEFAULT 'active'")
+      }
       if (!(await hasColumn('staff', 'bio'))) {
         await query('ALTER TABLE staff ADD COLUMN bio TEXT NULL')
       }

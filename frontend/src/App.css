@@ -1924,6 +1924,26 @@ select {
   flex-wrap: wrap;
 }
 
+.access-pill {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.access-pill.active {
+  background: rgba(28, 128, 77, 0.12);
+  color: #1c804d;
+}
+
+.access-pill.inactive {
+  background: rgba(237, 0, 18, 0.11);
+  color: #ed0012;
+}
+
 .row-actions button,
 .form-title-row button {
   padding: 8px 10px;

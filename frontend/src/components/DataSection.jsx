@@ -1,4 +1,6 @@
 export default function DataSection({ title, rows, columns, compact = false }) {
+  if (!rows.length) return null
+
   const visibleColumns = rows.length
     ? columns.filter((column) => rows.some((row) => row[column] !== undefined && row[column] !== null && row[column] !== ''))
     : columns

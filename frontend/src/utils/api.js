@@ -38,6 +38,7 @@ export async function api(path, options = {}) {
         localStorage.removeItem('kfa_token')
         localStorage.removeItem('token')
         localStorage.removeItem('kfa_session')
+        localStorage.removeItem('user')
         emit('kfa:auth-expired')
       }
       throw error

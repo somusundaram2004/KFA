@@ -24,23 +24,32 @@ function tokenExpired(token) {
 }
 
 function storedSession() {
-    const token = localStorage.getItem('kfa_token')
-  const session = JSON.parse(localStorage.getItem('kfa_session') || 'null')
+  const token = localStorage.getItem('kfa_token') || localStorage.getItem('token')
+  const session = JSON.parse(localStorage.getItem('kfa_session') || localStorage.getItem('user') || 'null')
 
   if (!session || !token || tokenExpired(token)) {
     localStorage.removeItem('kfa_token')
     localStorage.removeItem('token')
     localStorage.removeItem('kfa_session')
+    localStorage.removeItem('user')
     return null
   }
 
   return session
 }
 
+function currentPage(session) {
+  if (location.pathname === '/dashboard' && session?.role) {
+    return `${session.role}-dashboard`
+  }
+
+  return location.hash.replace('#', '') || 'home'
+}
+
 function App() {
-  const [page, setPage] = useState(location.hash.replace('#', '') || 'home')
   const [data, setData] = useState(getStore)
   const [session, setSession] = useState(storedSession)
+  const [page, setPage] = useState(() => currentPage(session))
   const [toast, setToast] = useState('')
   const [loadingMessage, setLoadingMessage] = useState('Preparing KFA...')
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
@@ -71,6 +80,10 @@ function App() {
     }
 
     function handleAuthExpired() {
+      localStorage.removeItem('kfa_token')
+      localStorage.removeItem('token')
+      localStorage.removeItem('kfa_session')
+      localStorage.removeItem('user')
       setSession(null)
       setAdminMenuOpen(false)
       setToast('Your login expired. Please sign in again.')
@@ -268,23 +281,26 @@ function App() {
     console.log('[LOGIN UI] Submit', { name, roleScope, passwordLength: password.length })
     setLoadingMessage('Signing in...')
     try {
-      const result = await api('/auth/login', { method: 'POST', body: JSON.stringify({ name, password }) })
-      console.log('[LOGIN UI] API login success', result.user)
-      if (roleScope === 'admin' && result.user.role !== 'admin') {
+      const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ name, password }) })
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      localStorage.setItem('kfa_token', data.token)
+      localStorage.setItem('kfa_session', JSON.stringify(data.user))
+      console.log('[LOGIN UI] API login success', data.user)
+      if (roleScope === 'admin' && data.user.role !== 'admin') {
         notify('This page is only for admin login.')
-        console.warn('[LOGIN UI] Non-admin tried admin login page', result.user)
+        console.warn('[LOGIN UI] Non-admin tried admin login page', data.user)
         return
       }
-      if (roleScope === 'portal' && result.user.role === 'admin') {
+      if (roleScope === 'portal' && data.user.role === 'admin') {
         notify('Admin must login from the admin page.')
         console.warn('[LOGIN UI] Admin tried staff/student page')
         return
       }
-      localStorage.setItem('kfa_token', result.token)
-      localStorage.setItem('token', result.token)
-      localStorage.setItem('kfa_session', JSON.stringify(result.user))
-      setSession(result.user)
-      navigate(`${result.user.role}-dashboard`)
+      setSession(data.user)
+      history.pushState({}, '', '/dashboard')
+      setPage(`${data.user.role}-dashboard`)
+      scrollTo({ top: 0, behavior: 'smooth' })
       return
     } catch (error) {
       if (error.status === 403) {
@@ -300,6 +316,7 @@ function App() {
       }
       console.log('[LOGIN UI] Local demo login success', user)
       localStorage.setItem('kfa_session', JSON.stringify(user))
+      localStorage.setItem('user', JSON.stringify(user))
       setSession(user)
       navigate(`${user.role}-dashboard`)
     } finally {
@@ -311,6 +328,7 @@ function App() {
     localStorage.removeItem('kfa_session')
     localStorage.removeItem('kfa_token')
     localStorage.removeItem('token')
+    localStorage.removeItem('user')
     setSession(null)
     navigate('home')
   }

@@ -12,7 +12,7 @@ const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSiz
 const tables = {
   branches: ['branch_name', 'location', 'phone'],
   users: ['name', 'dob', 'password', 'role', 'email', 'phone', 'branch_id'],
-  staff: ['user_id', 'specialization', 'salary', 'branch_id', 'photo_url', 'bio'],
+  staff: ['user_id', 'specialization', 'salary', 'branch_id', 'photo_url', 'bio', 'account_status'],
   students: ['user_id', 'admission_date', 'parent_name', 'branch_id', 'photo_url', 'account_status'],
   courses: ['course_name', 'description', 'duration', 'fees'],
   classes: ['course_id', 'staff_id', 'branch_id', 'day_of_week', 'start_time', 'end_time'],
@@ -604,29 +604,29 @@ router.post('/students/import/preview', adminOnly, importUpload.single('file'), 
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio } = req.body
+  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
   const password = await bcrypt.hash(dobToPassword(dob), 10)
   const userResult = await query(
     'INSERT INTO users (name, dob, password, role, email, phone, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [name, dob, password, 'staff', email, phone, branch_id],
   )
   const staffResult = await query(
-    'INSERT INTO staff (user_id, specialization, salary, branch_id, photo_url, bio) VALUES (?, ?, ?, ?, ?, ?)',
-    [userResult.insertId, specialization, salary, branch_id, photo_url, bio],
+    'INSERT INTO staff (user_id, specialization, salary, branch_id, photo_url, bio, account_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [userResult.insertId, specialization, salary, branch_id, photo_url, bio, account_status],
   )
-  res.status(201).json({ id: staffResult.insertId, user_id: userResult.insertId, name, dob, email, phone, specialization, salary, branch_id, photo_url, bio })
+  res.status(201).json({ id: staffResult.insertId, user_id: userResult.insertId, name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status })
 }))
 
 router.put('/staff/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio } = req.body
+  const { name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status = 'active' } = req.body
   const staffRows = await query('SELECT user_id FROM staff WHERE id = ?', [req.params.id])
   const userId = staffRows[0]?.user_id
   if (!userId) return res.status(404).json({ message: 'Staff not found' })
 
   await query('UPDATE users SET name = ?, dob = ?, email = ?, phone = ?, branch_id = ? WHERE id = ?', [name, dob, email, phone, branch_id, userId])
-  await query('UPDATE staff SET specialization = ?, salary = ?, branch_id = ?, photo_url = ?, bio = ? WHERE id = ?', [specialization, salary, branch_id, photo_url, bio, req.params.id])
-  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, specialization, salary, branch_id, photo_url, bio })
+  await query('UPDATE staff SET specialization = ?, salary = ?, branch_id = ?, photo_url = ?, bio = ?, account_status = ? WHERE id = ?', [specialization, salary, branch_id, photo_url, bio, account_status, req.params.id])
+  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, specialization, salary, branch_id, photo_url, bio, account_status })
 }))
 
 router.put('/site-content/homepage', adminOnly, asyncHandler(async (req, res) => {

@@ -54,7 +54,7 @@ export default function Header({ session, navigate, logout, showAdminMenu, onAdm
           <>
             <button onClick={() => go('home')}>Home</button>
             <button onClick={() => go('enquiry')}>Enquiry</button>
-            <button onClick={() => go('register-student')}>Register</button>
+            <button onClick={() => go('register-student')}>Student Register</button>
             <button onClick={() => go('ladmin')}>Admin</button>
             <button className="solid" onClick={() => go('login')}>Student / Staff Login</button>
           </>

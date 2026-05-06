@@ -16,9 +16,10 @@ router.post('/login', asyncHandler(async (req, res) => {
     time: new Date().toISOString(),
   })
 
-  const users = await query(`SELECT u.id, u.name, u.dob, u.password, u.role, u.email, u.phone, s.account_status
+  const users = await query(`SELECT u.id, u.name, u.dob, u.password, u.role, u.email, u.phone, COALESCE(s.account_status, st.account_status) account_status
     FROM users u
     LEFT JOIN students s ON s.user_id = u.id
+    LEFT JOIN staff st ON st.user_id = u.id
     WHERE LOWER(u.name) = LOWER(?)
     LIMIT 1`, [name])
   const user = users[0]
@@ -45,6 +46,11 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (user.role === 'student' && user.account_status !== 'active') {
     console.log('[AUTH] Student login blocked', { id: user.id, accountStatus: user.account_status })
     return res.status(403).json({ message: 'Student account is waiting for admin activation.' })
+  }
+
+  if (user.role === 'staff' && user.account_status !== 'active') {
+    console.log('[AUTH] Staff login blocked', { id: user.id, accountStatus: user.account_status })
+    return res.status(403).json({ message: 'Staff account is inactive. Contact admin.' })
   }
 
   if (plainTextMatch) {
