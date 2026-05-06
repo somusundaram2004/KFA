@@ -2082,6 +2082,46 @@ select {
   font-weight: 900;
 }
 
+.portal-alert-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.portal-alert-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.portal-alert-card {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid rgba(237, 0, 18, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(237, 0, 18, 0.07), transparent 42%),
+    #fff;
+  box-shadow: 0 14px 34px rgba(35, 29, 84, 0.08);
+}
+
+.portal-alert-card span {
+  color: #ed0012;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.portal-alert-card strong {
+  color: #171141;
+  font-size: 1rem;
+}
+
+.portal-alert-card p {
+  margin: 0;
+  color: #625b74;
+  font-weight: 700;
+}
+
 .progress-track {
   height: 12px;
   overflow: hidden;

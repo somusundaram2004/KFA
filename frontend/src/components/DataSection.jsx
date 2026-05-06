@@ -1,4 +1,8 @@
 export default function DataSection({ title, rows, columns, compact = false }) {
+  const visibleColumns = rows.length
+    ? columns.filter((column) => rows.some((row) => row[column] !== undefined && row[column] !== null && row[column] !== ''))
+    : columns
+
   return (
     <section className={compact ? 'panel' : 'table-section'}>
       <h3>{title}</h3>
@@ -8,12 +12,12 @@ export default function DataSection({ title, rows, columns, compact = false }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr>{columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}</tr>
+              <tr>{visibleColumns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}</tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  {columns.map((column) => <td key={column}>{String(row[column] ?? '-')}</td>)}
+                  {visibleColumns.map((column) => <td key={column}>{String(row[column] ?? '-')}</td>)}
                 </tr>
               ))}
             </tbody>

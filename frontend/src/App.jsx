@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AnimatedBackground from './components/AnimatedBackground'
 import Header from './components/Header'
 import LoadingOverlay from './components/LoadingOverlay'
@@ -43,11 +43,59 @@ function App() {
   const [toast, setToast] = useState('')
   const [loadingMessage, setLoadingMessage] = useState('Preparing KFA...')
   const [adminMenuOpen, setAdminMenuOpen] = useState(false)
+  const loadingCountRef = useRef(0)
+  const pageLoadingTimerRef = useRef(null)
 
   useEffect(() => {
     const onHash = () => setPage(location.hash.replace('#', '') || 'home')
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
+  }, [])
+
+  useEffect(() => {
+    function startLoading(event) {
+      loadingCountRef.current += 1
+      setLoadingMessage(event.detail?.message || 'Loading...')
+    }
+
+    function endLoading() {
+      loadingCountRef.current = Math.max(0, loadingCountRef.current - 1)
+      if (loadingCountRef.current === 0) {
+        setTimeout(() => {
+          if (loadingCountRef.current === 0) {
+            setLoadingMessage('')
+          }
+        }, 180)
+      }
+    }
+
+    function handleAuthExpired() {
+      setSession(null)
+      setAdminMenuOpen(false)
+      setToast('Your login expired. Please sign in again.')
+      setTimeout(() => setToast(''), 3200)
+      location.hash = 'login'
+      setPage('login')
+    }
+
+    function handleUnhandledRejection(event) {
+      if (event.reason?.status === 401) {
+        event.preventDefault()
+        handleAuthExpired()
+      }
+    }
+
+    addEventListener('kfa:loading-start', startLoading)
+    addEventListener('kfa:loading-end', endLoading)
+    addEventListener('kfa:auth-expired', handleAuthExpired)
+    addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      removeEventListener('kfa:loading-start', startLoading)
+      removeEventListener('kfa:loading-end', endLoading)
+      removeEventListener('kfa:auth-expired', handleAuthExpired)
+      removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
   }, [])
 
   useEffect(() => {
@@ -107,6 +155,13 @@ function App() {
 
   function navigate(next) {
     setAdminMenuOpen(false)
+    setLoadingMessage('Loading page...')
+    clearTimeout(pageLoadingTimerRef.current)
+    pageLoadingTimerRef.current = setTimeout(() => {
+      if (loadingCountRef.current === 0) {
+        setLoadingMessage('')
+      }
+    }, 520)
     location.hash = next
     setPage(next)
     scrollTo({ top: 0, behavior: 'smooth' })
@@ -351,6 +406,7 @@ function App() {
   const currentRole = session?.role
   const protectedPage = page.includes('dashboard') && !session
   const visiblePage = protectedPage ? 'login' : page
+  const dashboardWithSidebar = ['admin-dashboard', 'staff-dashboard', 'student-dashboard'].includes(visiblePage)
 
   return (
     <div className="app-shell">
@@ -361,7 +417,7 @@ function App() {
         session={session}
         navigate={navigate}
         logout={logout}
-        showAdminMenu={visiblePage === 'admin-dashboard'}
+        showAdminMenu={dashboardWithSidebar}
         adminMenuOpen={adminMenuOpen}
         onAdminMenuClick={() => setAdminMenuOpen((open) => !open)}
       />
@@ -371,8 +427,8 @@ function App() {
       {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
       {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} navigate={navigate} />}
       {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} previewStudentImport={previewStudentImport} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
-      {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} />}
-      {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} addRecord={addRecord} />}
+      {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}
     </div>
   )
