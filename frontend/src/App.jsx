@@ -62,6 +62,9 @@ function App() {
   }
 
   async function refreshDashboardData() {
+    if (!localStorage.getItem('kfa_token')) {
+      throw new Error('Login token is missing. Please sign in again.')
+    }
     const dashboard = await api('/me/dashboard')
     updateData((current) => ({ ...current, ...dashboard }))
   }
@@ -158,6 +161,12 @@ function App() {
         await refreshDashboardData()
       } catch (dashboardError) {
         console.warn('[LOGIN UI] Dashboard fetch failed, keeping local data', dashboardError)
+        if (dashboardError.status === 401) {
+          setSession(null)
+          notify('Your login expired. Please sign in again.')
+          navigate('login')
+          return
+        }
       }
       navigate(`${result.user.role}-dashboard`)
       return

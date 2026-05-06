@@ -13,7 +13,7 @@ export async function api(path, options = {}) {
     ...options,
   })
   if (!response.ok) {
-    let detail = {}
+    let detail
     try {
       detail = await response.json()
     } catch {
@@ -21,6 +21,10 @@ export async function api(path, options = {}) {
     }
     const error = new Error(detail.message || 'API request failed')
     error.status = response.status
+    if (response.status === 401) {
+      localStorage.removeItem('kfa_token')
+      localStorage.removeItem('kfa_session')
+    }
     throw error
   }
   return response.json()
