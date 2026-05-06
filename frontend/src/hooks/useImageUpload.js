@@ -25,7 +25,7 @@ function withFallbackImage(item) {
 }
 
 function authHeaders() {
-  const token = localStorage.getItem('kfa_token')
+  const token = localStorage.getItem('kfa_token') || localStorage.getItem('token')
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 

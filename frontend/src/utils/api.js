@@ -9,7 +9,7 @@ function emit(name, detail = {}) {
 
 export async function api(path, options = {}) {
   const { loadingMessage = 'Loading...', silentLoading = false, ...fetchOptions } = options
-  const token = localStorage.getItem('kfa_token')
+  const token = localStorage.getItem('kfa_token') || localStorage.getItem('token')
   const isFormData = fetchOptions.body instanceof FormData
 
   if (!silentLoading) {
@@ -36,6 +36,7 @@ export async function api(path, options = {}) {
       error.status = response.status
       if (response.status === 401) {
         localStorage.removeItem('kfa_token')
+        localStorage.removeItem('token')
         localStorage.removeItem('kfa_session')
         emit('kfa:auth-expired')
       }

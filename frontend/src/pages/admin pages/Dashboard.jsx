@@ -25,12 +25,27 @@ function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
 
   async function uploadFieldFile(field, file) {
     if (!file) return
+    const token = localStorage.getItem('kfa_token') || localStorage.getItem('token')
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('kfa:auth-expired'))
+      return
+    }
+
     const formData = new FormData()
     formData.append('file', file)
     setUploadingField(field.name)
     try {
-      const uploaded = await api(field.uploadPath || '/uploads/materials', { method: 'POST', body: formData })
+      const uploaded = await api(field.uploadPath || '/uploads/materials', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        loadingMessage: 'Uploading image...',
+      })
       setForm((current) => ({ ...current, [field.name]: uploaded.url }))
+    } catch (error) {
+      console.warn('[ADMIN] File upload failed', error)
     } finally {
       setUploadingField('')
     }
@@ -402,7 +417,7 @@ function AttendanceView({ data }) {
 }
 
 function FeesView({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
-  const [filters, setFilters] = useState({ branch_id: '', student_id: '', status: '', fee_type: '' })
+  const filters = { branch_id: '', student_id: '', status: '', fee_type: '' }
   const rows = data.fees.filter((fee) => Object.entries(filters).every(([key, value]) => !value || String(fee[key] ?? '') === String(value)))
   const paidCount = rows.filter((fee) => fee.status === 'paid').length
   const unpaidCount = rows.filter((fee) => fee.status !== 'paid').length

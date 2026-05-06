@@ -24,11 +24,12 @@ function tokenExpired(token) {
 }
 
 function storedSession() {
-  const token = localStorage.getItem('kfa_token')
+    const token = localStorage.getItem('kfa_token')
   const session = JSON.parse(localStorage.getItem('kfa_session') || 'null')
 
   if (!session || !token || tokenExpired(token)) {
     localStorage.removeItem('kfa_token')
+    localStorage.removeItem('token')
     localStorage.removeItem('kfa_session')
     return null
   }
@@ -181,7 +182,7 @@ function App() {
   }
 
   async function refreshDashboardData(message = 'Loading dashboard...') {
-    if (!localStorage.getItem('kfa_token')) {
+    if (!localStorage.getItem('kfa_token') && !localStorage.getItem('token')) {
       throw new Error('Login token is missing. Please sign in again.')
     }
     setLoadingMessage(message)
@@ -280,6 +281,7 @@ function App() {
         return
       }
       localStorage.setItem('kfa_token', result.token)
+      localStorage.setItem('token', result.token)
       localStorage.setItem('kfa_session', JSON.stringify(result.user))
       setSession(result.user)
       navigate(`${result.user.role}-dashboard`)
@@ -308,6 +310,7 @@ function App() {
   function logout() {
     localStorage.removeItem('kfa_session')
     localStorage.removeItem('kfa_token')
+    localStorage.removeItem('token')
     setSession(null)
     navigate('home')
   }
