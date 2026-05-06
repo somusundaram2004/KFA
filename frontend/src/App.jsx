@@ -43,6 +43,10 @@ function currentPage(session) {
     return 'admin-login'
   }
 
+  if (location.hash === '#admin') {
+    return 'admin-login'
+  }
+
   if (location.pathname === '/dashboard' && session?.role) {
     return `${session.role}-dashboard`
   }
@@ -61,10 +65,10 @@ function App() {
   const pageLoadingTimerRef = useRef(null)
 
   useEffect(() => {
-    const onHash = () => setPage(location.hash.replace('#', '') || 'home')
+    const onHash = () => setPage(currentPage(session))
     addEventListener('hashchange', onHash)
     return () => removeEventListener('hashchange', onHash)
-  }, [])
+  }, [session])
 
   useEffect(() => {
     function startLoading(event) {
