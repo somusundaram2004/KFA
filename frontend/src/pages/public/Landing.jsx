@@ -2,83 +2,9 @@ import { useState } from 'react'
 import { API_ORIGIN } from '../../utils/api'
 import SectionTitle from '../../components/SectionTitle'
 import InlineEnquiry from '../../components/InlineEnquiry'
+import { defaultSiteContent } from '../../data/siteContent'
 
 const bgVideo = 'https://res.cloudinary.com/drreokecb/video/upload/v1777871039/Bgvideo_exgier.mp4'
-
-export const defaultSiteContent = {
-  sitePrimaryColor: '#ed0012',
-  siteSecondaryColor: '#2f2482',
-  siteDarkColor: '#171141',
-  siteLightColor: '#f8f5ef',
-  siteSurfaceColor: '#ffffff',
-  heroTitleSize: '5.7rem',
-  sectionSpacing: '72px',
-  cardRadius: '8px',
-  animationStrength: '1',
-  heroEyebrow: 'Admissions open for 2026',
-  heroTitle: 'Learn music, instruments, and dance with stage-ready training',
-  heroText: 'KFA Music Academy helps children, teens, and adults build confidence through structured classes, expert faculty, personal attention, and regular performance practice.',
-  heroPrimaryButton: 'Book a Free Demo Class',
-  heroSecondaryButton: 'View Courses',
-  trustOne: 'Weekend and weekday batches',
-  trustTwo: 'Beginner to advanced levels',
-  trustThree: 'Performance-focused learning',
-  heroStatNumber: '4+',
-  heroStatLabel: 'creative programs',
-  aboutLabel: 'About KFA',
-  aboutTitle: 'A focused academy for music, rhythm, and performance',
-  aboutText: 'From first notes to confident stage presence, our classes blend technique, discipline, creativity, and guided practice. Parents and learners get clear schedules, updates, and progress visibility through the academy portal.',
-  highlightOneTitle: 'Personal coaching',
-  highlightOneText: 'Small batches with attention to each learner',
-  highlightTwoTitle: 'Certified curriculum',
-  highlightTwoText: 'Step-by-step training with practice targets',
-  highlightThreeTitle: 'Stage exposure',
-  highlightThreeText: 'Recitals, showcases, and confidence building',
-  highlightFourTitle: 'Parent updates',
-  highlightFourText: 'Attendance, fees, and schedule visibility',
-  coursesLabel: 'Courses',
-  coursesTitle: 'Choose your creative path',
-  branchCoursesLabel: 'Branch-wise Courses',
-  branchCoursesTitle: 'Choose the nearest learning space',
-  timingLabel: 'Batch Timings',
-  timingTitle: 'Weekday evenings and weekend full-day batches',
-  weekdayTitle: 'Weekdays',
-  weekdaySubtitle: 'Evening batches',
-  weekdayTime: '5:00 PM to 9:00 PM',
-  weekendTitle: 'Weekends',
-  weekendSubtitle: 'Morning to evening batches',
-  weekendTime: '9:00 AM to 8:00 PM',
-  galleryLabel: 'Class Gallery',
-  galleryTitle: 'Photos and videos from our learning spaces',
-  facultyLabel: 'Faculty',
-  facultyTitle: 'Meet our staffs',
-  testimonialsLabel: 'Testimonials',
-  testimonialsTitle: 'Loved by students and parents',
-  testimonialOneQuote: 'The teachers keep the classes disciplined but warm. My child started performing with much more confidence.',
-  testimonialOneName: 'Parent of a vocal student',
-  testimonialTwoQuote: 'The demo class made course selection easy, and the regular updates help us follow practice at home.',
-  testimonialTwoName: 'Parent of a keyboard student',
-  testimonialThreeQuote: 'Stage practice and small batches helped me improve rhythm, timing, and confidence together.',
-  testimonialThreeName: 'Dance student',
-  eventsLabel: 'Events',
-  eventsTitle: 'Performance and progress moments',
-  eventOneTitle: 'Stage Recitals',
-  eventOneText: 'Regular performance practice for students to build confidence.',
-  eventTwoTitle: 'Certificate Focus',
-  eventTwoText: 'Structured learning paths for grade, academy, and university programs.',
-  eventThreeTitle: 'Parent Review Days',
-  eventThreeText: 'Progress sharing, attendance visibility, and guidance for home practice.',
-  admissionEyebrow: 'New batches starting soon',
-  admissionTitle: 'Start with a free counselling and demo session',
-  admissionButton: 'Enquire Now',
-  branchesLabel: 'Branches',
-  branchesTitle: 'Find KFA near you',
-  contactPhoneDisplay: '+91 98840 12802',
-  contactWhatsappNumber: '919884012802',
-  contactEmail: 'kfamusicacademy@gmail.com',
-  contactHours: 'Weekdays 5 PM-9 PM | Weekends 9 AM-8 PM',
-  whatsappMessage: 'Hi KFA Music Academy, I would like to enquire about classes.',
-}
 
 function mediaSrc(url) {
   if (!url) return ''
@@ -265,7 +191,7 @@ export default function Landing({ data, navigate, onEnquiry }) {
     return name.includes('dance')
   })
 
-  function enquireForCourse(course) {
+  function enquireForCourse() {
     setSelectedCourse(null)
     navigate('enquiry')
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
@@ -407,7 +333,10 @@ export default function Landing({ data, navigate, onEnquiry }) {
           <span className="eyebrow">{siteContent.admissionEyebrow}</span>
           <h2>{siteContent.admissionTitle}</h2>
         </div>
-        <button className="primary" onClick={() => navigate('enquiry')}>{siteContent.admissionButton}</button>
+        <div className="admission-actions">
+          <button className="primary" onClick={() => navigate('register-student')}>Register Student</button>
+          <button onClick={() => navigate('enquiry')}>{siteContent.admissionButton}</button>
+        </div>
       </section>
       <section className="section branch-locations">
         <SectionTitle label={siteContent.branchesLabel} title={siteContent.branchesTitle} />

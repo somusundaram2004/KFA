@@ -39,6 +39,10 @@ function storedSession() {
 }
 
 function currentPage(session) {
+  if (location.pathname === '/admin') {
+    return 'admin-login'
+  }
+
   if (location.pathname === '/dashboard' && session?.role) {
     return `${session.role}-dashboard`
   }
@@ -88,8 +92,8 @@ function App() {
       setAdminMenuOpen(false)
       setToast('Your login expired. Please sign in again.')
       setTimeout(() => setToast(''), 3200)
-      location.hash = 'login'
-      setPage('login')
+      location.hash = 'student-login'
+      setPage('student-login')
     }
 
     function handleUnhandledRejection(event) {
@@ -149,8 +153,8 @@ function App() {
           setToast('Your login expired. Please sign in again.')
           setTimeout(() => setToast(''), 3200)
           setAdminMenuOpen(false)
-          location.hash = 'login'
-          setPage('login')
+          location.hash = 'student-login'
+          setPage('student-login')
           scrollTo({ top: 0, behavior: 'smooth' })
         }
       } finally {
@@ -270,7 +274,7 @@ function App() {
     try {
       await api('/auth/register-student', { method: 'POST', body: JSON.stringify(form) })
       notify('Registered successfully. Admin must activate your login.')
-      navigate('login')
+      navigate('student-login')
     } catch (error) {
       console.warn('[APP] Student registration failed', error)
       notify('Registration failed. Student may already exist.')
@@ -287,14 +291,9 @@ function App() {
       localStorage.setItem('kfa_token', data.token)
       localStorage.setItem('kfa_session', JSON.stringify(data.user))
       console.log('[LOGIN UI] API login success', data.user)
-      if (roleScope === 'admin' && data.user.role !== 'admin') {
-        notify('This page is only for admin login.')
-        console.warn('[LOGIN UI] Non-admin tried admin login page', data.user)
-        return
-      }
-      if (roleScope === 'portal' && data.user.role === 'admin') {
-        notify('Admin must login from the admin page.')
-        console.warn('[LOGIN UI] Admin tried staff/student page')
+      if (roleScope !== data.user.role) {
+        notify(`This page is only for ${roleScope} login.`)
+        console.warn('[LOGIN UI] Wrong role tried login page', { expected: roleScope, user: data.user })
         return
       }
       setSession(data.user)
@@ -309,7 +308,7 @@ function App() {
       }
       console.warn('[LOGIN UI] API login failed, trying local demo data', error)
       const user = data.users.find((item) => item.name.toLowerCase() === name.toLowerCase() && dobPassword(item.dob) === password)
-      if (!user || (roleScope === 'admin' && user.role !== 'admin') || (roleScope === 'portal' && user.role === 'admin')) {
+      if (!user || user.role !== roleScope) {
         console.warn('[LOGIN UI] Local demo login failed', { name, roleScope, localUserFound: Boolean(user) })
         notify('Invalid login. Use Name as username and DOB as DDMMYYYY password.')
         return
@@ -426,7 +425,7 @@ function App() {
 
   const currentRole = session?.role
   const protectedPage = page.includes('dashboard') && !session
-  const visiblePage = protectedPage ? 'login' : page
+  const visiblePage = protectedPage ? 'student-login' : page
   const dashboardWithSidebar = ['admin-dashboard', 'staff-dashboard', 'student-dashboard'].includes(visiblePage)
 
   return (
@@ -445,8 +444,9 @@ function App() {
       {visiblePage === 'home' && <Landing data={data} navigate={navigate} onEnquiry={handleEnquiry} />}
       {visiblePage === 'enquiry' && <EnquiryPage onSubmit={handleEnquiry} />}
       {visiblePage === 'register-student' && <RegisterStudent branches={data.branches} onRegister={handleStudentRegister} navigate={navigate} />}
-      {(visiblePage === 'ladmin' || visiblePage === 'admin-login') && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
-      {visiblePage === 'login' && <Login title="Staff and Student Login" roleScope="portal" onLogin={handleLogin} navigate={navigate} />}
+      {visiblePage === 'admin-login' && <Login title="Admin Login" roleScope="admin" onLogin={handleLogin} navigate={navigate} admin />}
+      {visiblePage === 'student-login' && <Login title="Student Login" roleScope="student" onLogin={handleLogin} navigate={navigate} showRegister />}
+      {visiblePage === 'staff-login' && <Login title="Staff Login" roleScope="staff" onLogin={handleLogin} navigate={navigate} />}
       {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} previewStudentImport={previewStudentImport} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}

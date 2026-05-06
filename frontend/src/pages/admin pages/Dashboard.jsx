@@ -4,7 +4,7 @@ import DataSection from '../../components/DataSection'
 import StatGrid from '../../components/StatGrid'
 import { API_ORIGIN, api } from '../../utils/api'
 import { downloadReceipt, feeReceiptData, openReceipt, whatsappReceiptUrl } from '../../utils/receipts'
-import { defaultSiteContent } from '../public/Landing'
+import { defaultSiteContent } from '../../data/siteContent'
 
 function cleanRecord(record) {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, value === '' ? null : value]))

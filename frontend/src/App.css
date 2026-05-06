@@ -1229,6 +1229,19 @@ blockquote {
   max-width: 760px;
 }
 
+.admission-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.register-cta {
+  border-color: rgba(237, 0, 18, 0.3);
+  color: #ed0012;
+  font-weight: 900;
+}
+
 .branch-locations {
   position: relative;
   overflow: hidden;
@@ -1986,6 +1999,29 @@ select {
   margin-bottom: 4px;
   color: #5f5872;
   font-weight: 700;
+}
+
+.register-login-copy {
+  margin: 0;
+  color: #5f5872;
+  font-weight: 800;
+}
+
+.text-link-button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ed0012;
+  font: inherit;
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.text-link-button:hover {
+  color: #2f2482;
+  transform: none;
 }
 
 .login-panel h1 {
@@ -2987,6 +3023,11 @@ th {
   .admission-banner {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .admission-actions {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .dashboard,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function Login({ title, roleScope, onLogin, navigate, admin = false }) {
+export default function Login({ title, roleScope, onLogin, navigate, admin = false, showRegister = false }) {
   const [form, setForm] = useState({ name: '', password: '' })
   return (
     <main className={admin ? 'auth-page admin-auth' : 'auth-page'}>
@@ -14,7 +14,11 @@ export default function Login({ title, roleScope, onLogin, navigate, admin = fal
         <input required placeholder="Name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input required type="password" inputMode="numeric" placeholder="DOB password DDMMYYYY" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
         <button className="primary">Login</button>
-        {!admin && <button type="button" onClick={() => navigate?.('register-student')}>New student registration</button>}
+        {showRegister && (
+          <p className="register-login-copy">
+            New student? <button className="text-link-button" type="button" onClick={() => navigate?.('register-student')}>Register here</button>
+          </p>
+        )}
         <p className="hint">{admin ? 'Example: Admin / 01011980' : 'Example: Ravi / 15061990 or Arjun / 20052005'}</p>
       </form>
     </main>
