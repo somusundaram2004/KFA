@@ -729,6 +729,7 @@ function openPrintableReport({ title, subtitle, meta = [], sections = [] }) {
 
 function PrintReportsView({ data, optionSets }) {
   const [gradeExamId, setGradeExamId] = useState(data.grade_exams[0]?.id || '')
+  const [gradeBoardId, setGradeBoardId] = useState('')
   const [classId, setClassId] = useState('')
   const [branchId, setBranchId] = useState('')
   const [eventProgramId, setEventProgramId] = useState((data.event_programs || [])[0]?.id || '')
@@ -739,6 +740,10 @@ function PrintReportsView({ data, optionSets }) {
 
   const gradeRows = (data.student_academics || [])
     .filter((row) => !selectedExam || Number(row.grade_id) === Number(selectedExam.grade_id))
+    .filter((row) => {
+      if (!gradeBoardId) return true
+      return (data.grade_exams || []).some((exam) => Number(exam.exam_board_id) === Number(gradeBoardId) && Number(exam.grade_id) === Number(row.grade_id))
+    })
     .filter((row) => !branchId || Number(row.branch_id) === Number(branchId))
     .filter((row) => {
       if (!selectedClass) return true
@@ -756,6 +761,7 @@ function PrintReportsView({ data, optionSets }) {
       subtitle: 'Students allocated for selected grade exam',
       meta: [
         { label: 'Grade', value: selectedExam?.grade_name || 'All grade exams' },
+        { label: 'Exam Board', value: selectedExam?.exam_board_name || optionSets.gradeExamBoards.find((board) => String(board.value) === String(gradeBoardId))?.label || 'All boards' },
         { label: 'Exam Date', value: selectedExam?.exam_date || '-' },
         { label: 'Class', value: selectedClass ? `${selectedClass.course_name} | ${selectedClass.day_of_week}` : 'All classes' },
         { label: 'Branch', value: selectedBranch?.branch_name || 'All branches' },
@@ -830,6 +836,13 @@ function PrintReportsView({ data, optionSets }) {
           <select value={gradeExamId} onChange={(event) => setGradeExamId(event.target.value)}>
             <option value="">All Grade Exams</option>
             {optionSets.gradeExams.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="field-control">
+          <span>Exam Board</span>
+          <select value={gradeBoardId} onChange={(event) => setGradeBoardId(event.target.value)}>
+            <option value="">All Boards</option>
+            {optionSets.gradeExamBoards.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <label className="field-control">
@@ -994,6 +1007,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     ['Programs', data.programs.length],
     ['Grades', data.grade_levels.length],
     ['University Programs', data.university_programs.length],
+    ['Exam Boards', (data.exam_boards || []).length],
     ['Grade Exams', data.grade_exams.length],
     ['University Exams', data.university_exams.length],
     ['Results', data.academic_results.length],
@@ -1013,8 +1027,11 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     programs: data.programs.map((program) => ({ value: program.id, label: program.program_name })),
     grades: data.grade_levels.map((grade) => ({ value: grade.id, label: grade.grade_name })),
     universityPrograms: data.university_programs.map((program) => ({ value: program.id, label: `${program.program_name}${program.university_name ? ` - ${program.university_name}` : ''}` })),
-    gradeExams: data.grade_exams.map((exam) => ({ value: exam.id, label: `${exam.grade_name || 'Grade exam'} - ${exam.exam_date || 'No date'}` })),
-    universityExams: data.university_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_name || 'University exam'} - ${exam.exam_date || 'No date'}` })),
+    examBoards: (data.exam_boards || []).map((board) => ({ value: board.id, label: `${board.board_name}${board.board_type ? ` - ${board.board_type}` : ''}` })),
+    gradeExamBoards: (data.exam_boards || []).filter((board) => ['grade', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name })),
+    universityExamBoards: (data.exam_boards || []).filter((board) => ['university', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name })),
+    gradeExams: data.grade_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.grade_name || 'Grade exam'} - ${exam.exam_date || 'No date'}` })),
+    universityExams: data.university_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.exam_name || 'University exam'} - ${exam.exam_date || 'No date'}` })),
     eventPrograms: (data.event_programs || []).map((program) => ({ value: program.id, label: program.program_name })),
     eventTeams: (data.event_program_teams || []).map((team) => ({ value: team.id, label: `${team.team_name}${team.program_name ? ` - ${team.program_name}` : ''}` })),
     eventParticipants: (data.event_program_participants || []).map((item) => ({ value: item.id, label: `${item.student_name || 'Student'} - ${item.program_name || 'Program'}` })),
@@ -1028,6 +1045,8 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     chargeTypes: ['program fee', 'vehicle charge', 'costume charge', 'food charge', 'specific charge', 'other'].map((type) => ({ value: type, label: type })),
     feeStatuses: ['pending', 'partial', 'paid'].map((status) => ({ value: status, label: status })),
     studentAccountStatuses: ['pending', 'active', 'inactive'].map((status) => ({ value: status, label: status })),
+    boardTypes: ['grade', 'university', 'both'].map((type) => ({ value: type, label: type })),
+    academicTracks: ['regular', 'grade', 'university', 'grade_university', 'other'].map((track) => ({ value: track, label: track.replaceAll('_', ' ') })),
     notificationRoles: ['all', 'admin', 'staff', 'student'].map((role) => ({ value: role, label: role })),
   }
 
@@ -1151,15 +1170,17 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                   { name: 'parent_name', label: 'Parent Name' },
                   { name: 'photo_url', label: 'Student Photo', type: 'file', uploadPath: '/uploads/student-photos', required: false },
                   { name: 'account_status', label: 'Login Access', type: 'select', options: optionSets.studentAccountStatuses, required: false },
+                  { name: 'academic_track', label: 'Academic Track', type: 'select', options: optionSets.academicTracks, required: false },
                   { name: 'program_id', label: 'Non-Exam Program', type: 'select', options: optionSets.programs, required: false },
                   { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades, required: false },
                   { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms, required: false },
+                  { name: 'other_exam_name', label: 'Other Exam Plan', required: false },
                   { name: 'start_date', label: 'Academic Start Date', type: 'date', required: false },
                   { name: 'status', label: 'Academic Status', type: 'select', options: optionSets.statuses, required: false },
                 ]}
                 rows={data.students}
-                columns={['name', 'branch_name', 'dob', 'email', 'phone', 'account_status', 'admission_date', 'parent_name', 'photo_url', 'program_name', 'grade_name', 'university_program_name', 'status']}
-                filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }]}
+                columns={['name', 'branch_name', 'dob', 'email', 'phone', 'account_status', 'admission_date', 'parent_name', 'photo_url', 'academic_track', 'program_name', 'grade_name', 'university_program_name', 'other_exam_name', 'status']}
+                filters={[{ name: 'branch_id', label: 'Branch', options: optionSets.branches }, { name: 'account_status', label: 'Login Access', options: optionSets.studentAccountStatuses }, { name: 'academic_track', label: 'Academic Track', options: optionSets.academicTracks }]}
                 addRecord={addRecord}
                 updateRecord={updateRecord}
                 deleteRecord={deleteRecord}
@@ -1313,14 +1334,32 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
           {activePage === 'exams' && (
             <div className="dashboard-grid">
               <ManagedSection
+                type="exam_boards"
+                title="Add Exam Board"
+                fields={[
+                  { name: 'board_name', label: 'Board / University Name' },
+                  { name: 'board_type', label: 'Used For', type: 'select', options: optionSets.boardTypes },
+                  { name: 'description', label: 'Description', type: 'textarea', required: false },
+                ]}
+                rows={data.exam_boards || []}
+                columns={['board_name', 'board_type', 'description']}
+                filters={[{ name: 'board_type', label: 'Used For', options: optionSets.boardTypes }]}
+                addRecord={addRecord}
+                updateRecord={updateRecord}
+                deleteRecord={deleteRecord}
+              />
+              <ManagedSection
                 type="grade_exams"
                 title="Add Grade Exam"
                 fields={[
+                  { name: 'exam_board_id', label: 'Exam Board', type: 'select', options: optionSets.gradeExamBoards },
                   { name: 'grade_id', label: 'Grade Level', type: 'select', options: optionSets.grades },
+                  { name: 'exam_name', label: 'Exam Name', required: false },
                   { name: 'exam_date', label: 'Exam Date', type: 'date' },
                 ]}
                 rows={data.grade_exams}
-                columns={['grade_name', 'exam_date']}
+                columns={['exam_board_name', 'grade_name', 'exam_name', 'exam_date']}
+                filters={[{ name: 'exam_board_id', label: 'Exam Board', options: optionSets.gradeExamBoards }, { name: 'grade_id', label: 'Grade', options: optionSets.grades }]}
                 addRecord={addRecord}
                 updateRecord={updateRecord}
                 deleteRecord={deleteRecord}
@@ -1329,12 +1368,14 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 type="university_exams"
                 title="Add University Exam"
                 fields={[
+                  { name: 'exam_board_id', label: 'Exam Board / University', type: 'select', options: optionSets.universityExamBoards },
                   { name: 'university_program_id', label: 'University Program', type: 'select', options: optionSets.universityPrograms },
                   { name: 'exam_name', label: 'Exam Name' },
                   { name: 'exam_date', label: 'Exam Date', type: 'date' },
                 ]}
                 rows={data.university_exams}
-                columns={['university_program_name', 'exam_name', 'exam_date']}
+                columns={['exam_board_name', 'university_program_name', 'exam_name', 'exam_date']}
+                filters={[{ name: 'exam_board_id', label: 'Exam Board', options: optionSets.universityExamBoards }, { name: 'university_program_id', label: 'University Program', options: optionSets.universityPrograms }]}
                 addRecord={addRecord}
                 updateRecord={updateRecord}
                 deleteRecord={deleteRecord}
@@ -1355,7 +1396,8 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 { name: 'result_status', label: 'Result Status', type: 'select', options: optionSets.resultStatuses },
               ]}
               rows={data.academic_results}
-              columns={['student_name', 'grade_name', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']}
+              columns={['student_name', 'grade_exam_board', 'grade_name', 'university_exam_board', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']}
+              filters={[{ name: 'grade_exam_id', label: 'Grade Exam', options: optionSets.gradeExams }, { name: 'university_exam_id', label: 'University Exam', options: optionSets.universityExams }, { name: 'result_status', label: 'Result Status', options: optionSets.resultStatuses }]}
               addRecord={addRecord}
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}

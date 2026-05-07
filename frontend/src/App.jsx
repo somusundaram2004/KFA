@@ -226,6 +226,7 @@ function App() {
     const program = source.programs?.find((item) => Number(item.id) === Number(record.program_id))
     const grade = source.grade_levels?.find((item) => Number(item.id) === Number(record.grade_id))
     const universityProgram = source.university_programs?.find((item) => Number(item.id) === Number(record.university_program_id))
+    const examBoard = source.exam_boards?.find((item) => Number(item.id) === Number(record.exam_board_id))
     const classRow = source.classes?.find((item) => Number(item.id) === Number(record.class_id))
     const fee = source.fees?.find((item) => Number(item.id) === Number(record.fee_id))
     const gradeExam = source.grade_exams?.find((item) => Number(item.id) === Number(record.grade_exam_id))
@@ -242,6 +243,7 @@ function App() {
     if (program) next.program_name = program.program_name
     if (grade) next.grade_name = grade.grade_name
     if (universityProgram) next.university_program_name = universityProgram.program_name
+    if (examBoard) next.exam_board_name = examBoard.board_name
     if (classRow) {
       next.course_name ||= classRow.course_name
       next.branch_name ||= classRow.branch_name
@@ -403,6 +405,17 @@ function App() {
     notify('Site content updated successfully.')
   }
 
+  async function updateStudentAcademicDetails(record) {
+    try {
+      await api('/me/academic-details', { method: 'POST', body: JSON.stringify(record) })
+      await refreshDashboardData('Saving academic details...')
+      notify('Academic details saved. Dashboard is ready.')
+    } catch (error) {
+      console.warn('[APP] Student academic details save failed', error)
+      notify(error.message || 'Please complete your academic details.')
+    }
+  }
+
   async function importStudents(file) {
     const formData = new FormData()
     formData.append('file', file)
@@ -456,7 +469,7 @@ function App() {
       {visiblePage === 'staff-login' && <Login title="Staff Login" roleScope="staff" onLogin={handleLogin} navigate={navigate} />}
       {visiblePage === 'admin-dashboard' && currentRole === 'admin' && <AdminDashboard data={data} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} updateSiteContent={updateSiteContent} importStudents={importStudents} previewStudentImport={previewStudentImport} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage === 'staff-dashboard' && currentRole === 'staff' && <StaffDashboard data={data} session={session} markAttendance={markAttendance} addRecord={addRecord} updateRecord={updateRecord} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
-      {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
+      {visiblePage === 'student-dashboard' && currentRole === 'student' && <StudentDashboard data={data} session={session} onSaveAcademicDetails={updateStudentAcademicDetails} sidebarOpen={adminMenuOpen} setSidebarOpen={setAdminMenuOpen} />}
       {visiblePage.includes('dashboard') && session && !visiblePage.startsWith(currentRole) && <AccessDenied navigate={navigate} role={currentRole} />}
     </div>
   )

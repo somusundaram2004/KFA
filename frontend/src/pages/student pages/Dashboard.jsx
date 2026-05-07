@@ -17,6 +17,102 @@ function hasRows(rows) {
   return Array.isArray(rows) && rows.length > 0
 }
 
+function hasRequiredAcademicDetails(academic) {
+  return Boolean(academic?.program_id || academic?.grade_id || academic?.university_program_id || academic?.academic_track)
+}
+
+function StudentAcademicDetailsGate({ data, student, session, onSaveAcademicDetails }) {
+  const [form, setForm] = useState({
+    academic_track: 'regular',
+    program_id: '',
+    grade_id: '',
+    university_program_id: '',
+    other_exam_name: '',
+    start_date: new Date().toISOString().slice(0, 10),
+  })
+  const [saving, setSaving] = useState(false)
+  const programs = data.programs || []
+  const grades = data.grade_levels || []
+  const universityPrograms = data.university_programs || []
+
+  async function submit(event) {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      await onSaveAcademicDetails(form)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <DashboardFrame title="Student Dashboard" role={session.name} fullScreen>
+      <section className="admin-workspace academic-gate-workspace">
+        <section className="portal-hero academic-gate-hero">
+          <div>
+            <span className="eyebrow">Academic details required</span>
+            <h2>{student?.name || session.name}</h2>
+            <p>Fill your program and grade details to open your dashboard, fees, attendance, events, results, and alerts.</p>
+          </div>
+        </section>
+
+        <form className="panel form-grid academic-gate-form" onSubmit={submit}>
+          <div className="form-title-row">
+            <div>
+              <h3>Complete Academic Details</h3>
+              <p className="hint">Choose the track that applies to you. Regular class students can save without grade or university exam details.</p>
+            </div>
+          </div>
+          <label className="field-control">
+            <span>Academic Track</span>
+            <select required value={form.academic_track} onChange={(event) => setForm({ ...form, academic_track: event.target.value })}>
+              <option value="regular">Regular Classes Only</option>
+              <option value="grade">Grade Exam</option>
+              <option value="university">University Exam</option>
+              <option value="grade_university">Grade And University Exam</option>
+              <option value="other">Other Exam Plan</option>
+            </select>
+          </label>
+          <label className="field-control">
+            <span>Program</span>
+            <select value={form.program_id} onChange={(event) => setForm({ ...form, program_id: event.target.value })}>
+              <option value="">Select Program</option>
+              {programs.map((program) => <option key={program.id} value={program.id}>{program.program_name}</option>)}
+            </select>
+          </label>
+          <label className="field-control">
+            <span>Grade</span>
+            <select required={['grade', 'grade_university'].includes(form.academic_track)} value={form.grade_id} onChange={(event) => setForm({ ...form, grade_id: event.target.value })}>
+              <option value="">Select Grade</option>
+              {grades.map((grade) => <option key={grade.id} value={grade.id}>{grade.grade_name}</option>)}
+            </select>
+          </label>
+          <label className="field-control">
+            <span>University Program</span>
+            <select required={['university', 'grade_university'].includes(form.academic_track)} value={form.university_program_id} onChange={(event) => setForm({ ...form, university_program_id: event.target.value })}>
+              <option value="">Select University Program</option>
+              {universityPrograms.map((program) => (
+                <option key={program.id} value={program.id}>{program.program_name}{program.university_name ? ` - ${program.university_name}` : ''}</option>
+              ))}
+            </select>
+          </label>
+          {form.academic_track === 'other' && (
+            <label className="field-control">
+              <span>Other Exam Plan</span>
+              <input required value={form.other_exam_name} onChange={(event) => setForm({ ...form, other_exam_name: event.target.value })} />
+            </label>
+          )}
+          <label className="field-control">
+            <span>Start Date</span>
+            <input type="date" required value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} />
+          </label>
+          <button className="primary" disabled={saving}>{saving ? 'Saving...' : 'Save And Open Dashboard'}</button>
+        </form>
+      </section>
+    </DashboardFrame>
+  )
+}
+
 function StudentAlerts({ notifications, due }) {
   const alerts = [
     due > 0 && { id: 'fee-due', title: 'Fee due', message: `Pending amount: Rs. ${due.toLocaleString('en-IN')}` },
@@ -48,11 +144,13 @@ function StudentAlerts({ notifications, due }) {
   )
 }
 
-export default function StudentDashboard({ data, session, sidebarOpen, setSidebarOpen }) {
+export default function StudentDashboard({ data, session, onSaveAcademicDetails, sidebarOpen, setSidebarOpen }) {
   const workspaceRef = useRef(null)
   const [activePage, setActivePage] = useState('overview')
   const student = (data.students || []).find((item) => Number(item.user_id) === Number(session.id)) || (data.students || []).find((item) => item.name === session.name)
   const academics = (data.student_academics || []).filter((item) => Number(item.student_id) === Number(student?.id))
+  const currentAcademic = academics[0]
+  const academicDetailsComplete = hasRequiredAcademicDetails(currentAcademic)
   const attendance = (data.attendance || []).filter((item) => Number(item.student_id) === Number(student?.id))
   const fees = (data.fees || []).filter((item) => Number(item.student_id) === Number(student?.id)).map((fee) => ({
     ...fee,
@@ -100,6 +198,10 @@ export default function StudentDashboard({ data, session, sidebarOpen, setSideba
   ].filter(Boolean)
 
   const activeMeta = studentPages.find((page) => page.id === activePage) || studentPages[0]
+
+  if (!academicDetailsComplete) {
+    return <StudentAcademicDetailsGate data={data} student={student} session={session} onSaveAcademicDetails={onSaveAcademicDetails} />
+  }
 
   function selectPage(pageId) {
     setActivePage(pageId)
@@ -168,7 +270,7 @@ export default function StudentDashboard({ data, session, sidebarOpen, setSideba
             </>
           )}
 
-          {activePage === 'programs' && <DataSection title="My Academic Program" rows={academics} columns={['program_name', 'grade_name', 'university_program_name', 'start_date', 'status']} />}
+          {activePage === 'programs' && <DataSection title="My Academic Program" rows={academics} columns={['academic_track', 'program_name', 'grade_name', 'university_program_name', 'other_exam_name', 'start_date', 'status']} />}
           {activePage === 'attendance' && <DataSection title="Attendance" rows={attendance} columns={['course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />}
 
           {activePage === 'fees' && (
@@ -204,7 +306,7 @@ export default function StudentDashboard({ data, session, sidebarOpen, setSideba
             </>
           )}
 
-          {activePage === 'results' && <DataSection title="Results" rows={results} columns={['grade_name', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']} />}
+          {activePage === 'results' && <DataSection title="Results" rows={results} columns={['grade_exam_board', 'grade_name', 'university_exam_board', 'exam_name', 'university_program_name', 'marks', 'grade', 'result_status']} />}
           {activePage === 'alerts' && <StudentAlerts notifications={notifications} due={due} />}
         </section>
       </div>

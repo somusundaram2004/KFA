@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import multer from 'multer'
 import { query } from '../db.js'
 import { requireAuth, allowRoles } from '../middleware/auth.js'
-import { ensureAttendanceDetailColumns, ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureAcademicDetailColumns, ensureAttendanceDetailColumns, ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler, dobToPassword, pick } from '../utils.js'
 
 const router = Router()
@@ -26,9 +26,10 @@ const tables = {
   programs: ['program_name', 'description', 'duration', 'fees'],
   grade_levels: ['grade_name', 'level_order', 'description'],
   university_programs: ['program_name', 'university_name', 'duration', 'fees'],
-  student_academics: ['student_id', 'branch_id', 'program_id', 'grade_id', 'university_program_id', 'start_date', 'status'],
-  grade_exams: ['grade_id', 'exam_date'],
-  university_exams: ['university_program_id', 'exam_name', 'exam_date'],
+  exam_boards: ['board_name', 'board_type', 'description'],
+  student_academics: ['student_id', 'branch_id', 'program_id', 'grade_id', 'university_program_id', 'academic_track', 'other_exam_name', 'start_date', 'status'],
+  grade_exams: ['grade_id', 'exam_board_id', 'exam_name', 'exam_date'],
+  university_exams: ['university_program_id', 'exam_board_id', 'exam_name', 'exam_date'],
   academic_results: ['student_id', 'grade_exam_id', 'university_exam_id', 'marks', 'grade', 'result_status'],
   event_programs: ['program_name', 'event_date', 'event_time', 'venue', 'branch_id', 'description', 'status', 'base_fee', 'vehicle_charge', 'extra_charge', 'charge_notes'],
   event_program_items: ['event_program_id', 'category', 'item_title', 'item_notes', 'display_order'],
@@ -221,6 +222,7 @@ router.use(requireAuth)
 router.use(asyncHandler(async (_req, _res, next) => {
   await ensureEventProgramTables()
   await ensureAttendanceDetailColumns()
+  await ensureAcademicDetailColumns()
   next()
 }))
 
@@ -253,6 +255,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       programs,
       grade_levels,
       university_programs,
+      exam_boards,
       student_academics,
       grade_exams,
       university_exams,
@@ -265,7 +268,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       event_program_charges,
     ] = await Promise.all([
       query('SELECT * FROM branches ORDER BY id DESC'),
-      query(`SELECT s.*, u.name, u.dob, u.email, u.phone, b.branch_name, sa.program_id, sa.grade_id, sa.university_program_id, sa.start_date, sa.status, p.program_name, gl.grade_name, up.program_name university_program_name
+      query(`SELECT s.*, u.name, u.dob, u.email, u.phone, b.branch_name, sa.program_id, sa.grade_id, sa.university_program_id, sa.academic_track, sa.other_exam_name, sa.start_date, sa.status, p.program_name, gl.grade_name, up.program_name university_program_name
         FROM students s
         JOIN users u ON u.id = s.user_id
         LEFT JOIN branches b ON b.id = s.branch_id
@@ -294,6 +297,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       query('SELECT * FROM programs ORDER BY id DESC'),
       query('SELECT * FROM grade_levels ORDER BY level_order, id'),
       query('SELECT * FROM university_programs ORDER BY id DESC'),
+      query('SELECT * FROM exam_boards ORDER BY id DESC'),
       query(`SELECT sa.*, u.name student_name, b.branch_name, p.program_name, gl.grade_name, up.program_name university_program_name
         FROM student_academics sa
         JOIN students s ON s.id = sa.student_id
@@ -303,15 +307,17 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         LEFT JOIN grade_levels gl ON gl.id = sa.grade_id
         LEFT JOIN university_programs up ON up.id = sa.university_program_id
         ORDER BY sa.id DESC`),
-      query(`SELECT ge.*, gl.grade_name
+      query(`SELECT ge.*, COALESCE(eb.board_name, ge.exam_board, 'Grade Board') exam_board_name, COALESCE(eb.board_type, 'grade') exam_board_type, gl.grade_name
         FROM grade_exams ge
         JOIN grade_levels gl ON gl.id = ge.grade_id
+        LEFT JOIN exam_boards eb ON eb.id = ge.exam_board_id
         ORDER BY ge.exam_date DESC, ge.id DESC`),
-      query(`SELECT ue.*, up.program_name university_program_name
+      query(`SELECT ue.*, COALESCE(eb.board_name, ue.exam_board, 'University Board') exam_board_name, COALESCE(eb.board_type, 'university') exam_board_type, up.program_name university_program_name
         FROM university_exams ue
         JOIN university_programs up ON up.id = ue.university_program_id
+        LEFT JOIN exam_boards eb ON eb.id = ue.exam_board_id
         ORDER BY ue.exam_date DESC, ue.id DESC`),
-      query(`SELECT ar.*, u.name student_name, gl.grade_name, ue.exam_name, up.program_name university_program_name
+      query(`SELECT ar.*, u.name student_name, gl.grade_name, COALESCE(geb.board_name, ge.exam_board, 'Grade Board') grade_exam_board, ue.exam_name, COALESCE(ueb.board_name, ue.exam_board, 'University Board') university_exam_board, up.program_name university_program_name
         FROM academic_results ar
         JOIN students s ON s.id = ar.student_id
         JOIN users u ON u.id = s.user_id
@@ -319,6 +325,8 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         LEFT JOIN grade_levels gl ON gl.id = ge.grade_id
         LEFT JOIN university_exams ue ON ue.id = ar.university_exam_id
         LEFT JOIN university_programs up ON up.id = ue.university_program_id
+        LEFT JOIN exam_boards geb ON geb.id = ge.exam_board_id
+        LEFT JOIN exam_boards ueb ON ueb.id = ue.exam_board_id
         ORDER BY ar.id DESC`),
       query(`SELECT py.*, u.name student_name, f.fee_type
         FROM payments py
@@ -453,7 +461,47 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       event_program_charges: [],
     })
   }
-  const [enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
+  const [notifications, programs, grade_levels, university_programs, academics] = await Promise.all([
+    query("SELECT * FROM notifications WHERE role IN ('student', 'all') ORDER BY created_at DESC"),
+    query('SELECT * FROM programs ORDER BY id DESC'),
+    query('SELECT * FROM grade_levels ORDER BY level_order, id'),
+    query('SELECT * FROM university_programs ORDER BY id DESC'),
+    query(`SELECT sa.*, u.name student_name, b.branch_name, p.program_name, gl.grade_name, up.program_name university_program_name
+      FROM student_academics sa
+      JOIN students s ON s.id = sa.student_id
+      JOIN users u ON u.id = s.user_id
+      LEFT JOIN branches b ON b.id = sa.branch_id
+      LEFT JOIN programs p ON p.id = sa.program_id
+      LEFT JOIN grade_levels gl ON gl.id = sa.grade_id
+      LEFT JOIN university_programs up ON up.id = sa.university_program_id
+      WHERE sa.student_id = ?
+      ORDER BY sa.id DESC`, [studentId]),
+  ])
+  const academicDetailsComplete = Boolean(academics[0]?.program_id || academics[0]?.grade_id || academics[0]?.university_program_id || academics[0]?.academic_track)
+
+  if (!academicDetailsComplete) {
+    return res.json({
+      students: studentRows,
+      student_academics: academics,
+      academic_results: [],
+      enrollments: [],
+      schedule: [],
+      attendance: [],
+      fees: [],
+      payments: [],
+      notifications,
+      programs,
+      grade_levels,
+      university_programs,
+      exam_boards,
+      event_programs: [],
+      event_program_items: [],
+      event_program_participants: [],
+      event_program_charges: [],
+    })
+  }
+
+  const [enrollments, schedule, attendance, fees, payments, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
     query('SELECT e.*, co.course_name FROM enrollments e JOIN courses co ON co.id = e.course_id WHERE e.student_id = ?', [studentId]),
     query('SELECT c.*, co.course_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id JOIN enrollments e ON e.course_id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE e.student_id = ?', [studentId]),
     query('SELECT a.*, co.course_name, b.branch_name FROM attendance a JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE a.student_id = ?', [studentId]),
@@ -473,7 +521,6 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       JOIN fees f ON f.id = py.fee_id
       WHERE f.student_id = ?
       ORDER BY py.payment_date DESC, py.id DESC`, [studentId]),
-    query("SELECT * FROM notifications WHERE role IN ('student', 'all') ORDER BY created_at DESC"),
     query(`SELECT ep.*, b.branch_name
       FROM event_programs ep
       JOIN event_program_participants epp ON epp.event_program_id = ep.id
@@ -500,17 +547,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       ORDER BY epp.id DESC`, [studentId]),
     query('SELECT epc.*, ep.program_name FROM event_program_charges epc JOIN event_programs ep ON ep.id = epc.event_program_id WHERE epc.student_id = ? ORDER BY epc.id DESC', [studentId]),
   ])
-  const academics = await query(`SELECT sa.*, u.name student_name, b.branch_name, p.program_name, gl.grade_name, up.program_name university_program_name
-    FROM student_academics sa
-    JOIN students s ON s.id = sa.student_id
-    JOIN users u ON u.id = s.user_id
-    LEFT JOIN branches b ON b.id = sa.branch_id
-    LEFT JOIN programs p ON p.id = sa.program_id
-    LEFT JOIN grade_levels gl ON gl.id = sa.grade_id
-    LEFT JOIN university_programs up ON up.id = sa.university_program_id
-    WHERE sa.student_id = ?
-    ORDER BY sa.id DESC`, [studentId])
-  const results = await query(`SELECT ar.*, u.name student_name, gl.grade_name, ue.exam_name, up.program_name university_program_name
+  const results = await query(`SELECT ar.*, u.name student_name, gl.grade_name, COALESCE(geb.board_name, ge.exam_board, 'Grade Board') grade_exam_board, ue.exam_name, COALESCE(ueb.board_name, ue.exam_board, 'University Board') university_exam_board, up.program_name university_program_name
     FROM academic_results ar
     JOIN students s ON s.id = ar.student_id
     JOIN users u ON u.id = s.user_id
@@ -518,14 +555,16 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
     LEFT JOIN grade_levels gl ON gl.id = ge.grade_id
     LEFT JOIN university_exams ue ON ue.id = ar.university_exam_id
     LEFT JOIN university_programs up ON up.id = ue.university_program_id
+    LEFT JOIN exam_boards geb ON geb.id = ge.exam_board_id
+    LEFT JOIN exam_boards ueb ON ueb.id = ue.exam_board_id
     WHERE ar.student_id = ?
     ORDER BY ar.id DESC`, [studentId])
-  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, attendance, fees, payments, notifications, event_programs, event_program_items, event_program_participants, event_program_charges })
+  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, attendance, fees, payments, notifications, programs, grade_levels, university_programs, event_programs, event_program_items, event_program_participants, event_program_charges })
 }))
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, status } = req.body
+  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, academic_track, other_exam_name, status } = req.body
   const dob = normalizeDateValue(req.body.dob)
   const admission_date = normalizeDateValue(req.body.admission_date)
   const start_date = normalizeDateValue(req.body.start_date)
@@ -538,18 +577,18 @@ router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
     'INSERT INTO students (user_id, admission_date, parent_name, branch_id, photo_url, account_status) VALUES (?, ?, ?, ?, ?, ?)',
     [userResult.insertId, admission_date, parent_name, branch_id, photo_url, account_status || 'active'],
   )
-  if (program_id || grade_id || university_program_id) {
+  if (program_id || grade_id || university_program_id || academic_track || other_exam_name) {
     await query(
-      'INSERT INTO student_academics (student_id, branch_id, program_id, grade_id, university_program_id, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [studentResult.insertId, branch_id, program_id || null, grade_id || null, university_program_id || null, start_date || admission_date, status || 'active'],
+      'INSERT INTO student_academics (student_id, branch_id, program_id, grade_id, university_program_id, academic_track, other_exam_name, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [studentResult.insertId, branch_id, program_id || null, grade_id || null, university_program_id || null, academic_track || 'regular', other_exam_name || null, start_date || admission_date, status || 'active'],
     )
   }
-  res.status(201).json({ id: studentResult.insertId, user_id: userResult.insertId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, start_date, status })
+  res.status(201).json({ id: studentResult.insertId, user_id: userResult.insertId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, academic_track, other_exam_name, start_date, status })
 }))
 
 router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await ensurePersonPhotoColumns()
-  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, status } = req.body
+  const { name, email, phone, parent_name, branch_id, photo_url, account_status, program_id, grade_id, university_program_id, academic_track, other_exam_name, status } = req.body
   const dob = normalizeDateValue(req.body.dob)
   const admission_date = normalizeDateValue(req.body.admission_date)
   const start_date = normalizeDateValue(req.body.start_date)
@@ -560,20 +599,20 @@ router.put('/students/full/:id', adminOnly, asyncHandler(async (req, res) => {
   await query('UPDATE users SET name = ?, dob = ?, email = ?, phone = ?, branch_id = ? WHERE id = ?', [name, dob, email, phone, branch_id, userId])
   await query('UPDATE students SET admission_date = ?, parent_name = ?, branch_id = ?, photo_url = ?, account_status = ? WHERE id = ?', [admission_date, parent_name, branch_id, photo_url, account_status || 'active', req.params.id])
   const academicRows = await query('SELECT id FROM student_academics WHERE student_id = ? ORDER BY id DESC LIMIT 1', [req.params.id])
-  if (program_id || grade_id || university_program_id) {
+  if (program_id || grade_id || university_program_id || academic_track || other_exam_name) {
     if (academicRows[0]) {
       await query(
-        'UPDATE student_academics SET branch_id = ?, program_id = ?, grade_id = ?, university_program_id = ?, start_date = ?, status = ? WHERE id = ?',
-        [branch_id, program_id || null, grade_id || null, university_program_id || null, start_date || admission_date, status || 'active', academicRows[0].id],
+        'UPDATE student_academics SET branch_id = ?, program_id = ?, grade_id = ?, university_program_id = ?, academic_track = ?, other_exam_name = ?, start_date = ?, status = ? WHERE id = ?',
+        [branch_id, program_id || null, grade_id || null, university_program_id || null, academic_track || 'regular', other_exam_name || null, start_date || admission_date, status || 'active', academicRows[0].id],
       )
     } else {
       await query(
-        'INSERT INTO student_academics (student_id, branch_id, program_id, grade_id, university_program_id, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [req.params.id, branch_id, program_id || null, grade_id || null, university_program_id || null, start_date || admission_date, status || 'active'],
+        'INSERT INTO student_academics (student_id, branch_id, program_id, grade_id, university_program_id, academic_track, other_exam_name, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [req.params.id, branch_id, program_id || null, grade_id || null, university_program_id || null, academic_track || 'regular', other_exam_name || null, start_date || admission_date, status || 'active'],
       )
     }
   }
-  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, start_date, status })
+  res.json({ id: Number(req.params.id), user_id: userId, name, dob, email, phone, admission_date, parent_name, branch_id, photo_url, account_status: account_status || 'active', program_id, grade_id, university_program_id, academic_track, other_exam_name, start_date, status })
 }))
 
 router.post('/students/import', adminOnly, importUpload.single('file'), asyncHandler(async (req, res) => {
@@ -606,6 +645,40 @@ router.post('/students/import', adminOnly, importUpload.single('file'), asyncHan
 router.post('/students/import/preview', adminOnly, importUpload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Excel file is required.' })
   res.json(await previewStudentRows(req.file))
+}))
+
+router.post('/me/academic-details', allowRoles('student'), asyncHandler(async (req, res) => {
+  const studentRows = await query('SELECT id, branch_id, admission_date FROM students WHERE user_id = ? LIMIT 1', [req.user.id])
+  const student = studentRows[0]
+  if (!student) return res.status(404).json({ message: 'Student profile not found.' })
+
+  const programId = req.body.program_id || null
+  const gradeId = req.body.grade_id || null
+  const universityProgramId = req.body.university_program_id || null
+  const academicTrack = req.body.academic_track || 'regular'
+  const otherExamName = req.body.other_exam_name || null
+  const startDate = normalizeDateValue(req.body.start_date) || student.admission_date || new Date().toISOString().slice(0, 10)
+
+  if (!programId && !gradeId && !universityProgramId && !academicTrack) {
+    return res.status(400).json({ message: 'Select regular class or one exam track before opening the dashboard.' })
+  }
+
+  const academicRows = await query('SELECT id FROM student_academics WHERE student_id = ? ORDER BY id DESC LIMIT 1', [student.id])
+  const values = [student.branch_id || null, programId, gradeId, universityProgramId, academicTrack, otherExamName, startDate, 'active']
+
+  if (academicRows[0]) {
+    await query(
+      'UPDATE student_academics SET branch_id = ?, program_id = ?, grade_id = ?, university_program_id = ?, academic_track = ?, other_exam_name = ?, start_date = ?, status = ? WHERE id = ?',
+      [...values, academicRows[0].id],
+    )
+    return res.json({ id: academicRows[0].id, student_id: student.id, branch_id: student.branch_id || null, program_id: programId, grade_id: gradeId, university_program_id: universityProgramId, academic_track: academicTrack, other_exam_name: otherExamName, start_date: startDate, status: 'active' })
+  }
+
+  const result = await query(
+    'INSERT INTO student_academics (student_id, branch_id, program_id, grade_id, university_program_id, academic_track, other_exam_name, start_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [student.id, ...values],
+  )
+  res.status(201).json({ id: result.insertId, student_id: student.id, branch_id: student.branch_id || null, program_id: programId, grade_id: gradeId, university_program_id: universityProgramId, academic_track: academicTrack, other_exam_name: otherExamName, start_date: startDate, status: 'active' })
 }))
 
 router.post('/staff/full', adminOnly, asyncHandler(async (req, res) => {

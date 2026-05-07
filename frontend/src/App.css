@@ -2178,6 +2178,27 @@ select {
   font-weight: 800;
 }
 
+.academic-gate-workspace {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.academic-gate-hero {
+  margin-top: 8px;
+}
+
+.academic-gate-form {
+  align-items: end;
+}
+
+.academic-gate-form .form-title-row {
+  grid-column: 1 / -1;
+}
+
+.academic-gate-form .empty {
+  grid-column: 1 / -1;
+}
+
 .empty-state-panel {
   border-style: dashed;
   background: rgba(255, 255, 255, 0.74);

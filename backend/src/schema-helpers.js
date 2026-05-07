@@ -5,6 +5,7 @@ let siteContentTableReady
 let eventProgramTablesReady
 let attendanceDetailColumnsReady
 let galleryTableReady
+let academicDetailColumnsReady
 
 async function hasColumn(table, column) {
   const rows = await query('SELECT COUNT(*) total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [table, column])
@@ -89,6 +90,42 @@ export async function ensureAttendanceDetailColumns() {
     })()
   }
   return attendanceDetailColumnsReady
+}
+
+export async function ensureAcademicDetailColumns() {
+  if (!academicDetailColumnsReady) {
+    academicDetailColumnsReady = (async () => {
+      if (!(await hasColumn('student_academics', 'academic_track'))) {
+        await query("ALTER TABLE student_academics ADD COLUMN academic_track VARCHAR(40) DEFAULT 'regular'")
+      }
+      if (!(await hasColumn('student_academics', 'other_exam_name'))) {
+        await query('ALTER TABLE student_academics ADD COLUMN other_exam_name VARCHAR(150) NULL')
+      }
+      await query(`CREATE TABLE IF NOT EXISTS exam_boards (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        board_name VARCHAR(150) NOT NULL,
+        board_type VARCHAR(30) DEFAULT 'grade',
+        description TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`)
+      if (!(await hasColumn('grade_exams', 'exam_board_id'))) {
+        await query('ALTER TABLE grade_exams ADD COLUMN exam_board_id INT NULL')
+      }
+      if (!(await hasColumn('grade_exams', 'exam_board'))) {
+        await query('ALTER TABLE grade_exams ADD COLUMN exam_board VARCHAR(80) NULL')
+      }
+      if (!(await hasColumn('grade_exams', 'exam_name'))) {
+        await query('ALTER TABLE grade_exams ADD COLUMN exam_name VARCHAR(120) NULL')
+      }
+      if (!(await hasColumn('university_exams', 'exam_board_id'))) {
+        await query('ALTER TABLE university_exams ADD COLUMN exam_board_id INT NULL')
+      }
+      if (!(await hasColumn('university_exams', 'exam_board'))) {
+        await query('ALTER TABLE university_exams ADD COLUMN exam_board VARCHAR(80) NULL')
+      }
+    })()
+  }
+  return academicDetailColumnsReady
 }
 
 export async function ensureEventProgramTables() {
