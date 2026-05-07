@@ -15,6 +15,30 @@ function formatDateValue(value) {
   return String(value).slice(0, 10)
 }
 
+function todayValue() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function monthValue(dateValue = todayValue()) {
+  return String(dateValue).slice(0, 7)
+}
+
+function sameDate(value, dateValue) {
+  return String(value || '').slice(0, 10) === dateValue
+}
+
+function calendarDays(month) {
+  const [year, monthIndex] = month.split('-').map(Number)
+  const first = new Date(year, monthIndex - 1, 1)
+  const totalDays = new Date(year, monthIndex, 0).getDate()
+  const blanks = Array.from({ length: first.getDay() }, () => null)
+  const days = Array.from({ length: totalDays }, (_item, index) => {
+    const day = index + 1
+    return `${year}-${String(monthIndex).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  })
+  return [...blanks, ...days]
+}
+
 function fieldValue(field, value) {
   if (field.type === 'date') return formatDateValue(value)
   return value ?? ''
@@ -24,6 +48,10 @@ function formatTableCell(column, value) {
   if (value === undefined || value === null || value === '') return '-'
   if (column === 'dob' || column.endsWith('_date') || column === 'date') return formatDateValue(value)
   return String(value)
+}
+
+function detailLine(parts) {
+  return parts.filter((part) => part !== undefined && part !== null && part !== '').join(' | ')
 }
 
 function mediaSrc(url) {
@@ -76,34 +104,42 @@ function AdminForm({ title, fields, initialRecord, onSubmit, onCancel }) {
         <h3>{initialRecord ? `Edit ${title}` : title}</h3>
         {initialRecord && <button type="button" onClick={onCancel}>Cancel</button>}
       </div>
-      {fields.map((field) => (
-        <label className="field-control" key={field.name}>
-          <span>{field.label}</span>
-          {field.type === 'select' ? (
-            <select required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })}>
-              <option value="">{field.placeholder || `Select ${field.label}`}</option>
-              {(field.options || []).map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          ) : field.type === 'textarea' ? (
-            <textarea required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
-          ) : field.type === 'file' ? (
-            <>
-              <input type="file" accept={field.accept || 'image/*'} required={field.required !== false && !form[field.name]} onChange={(event) => uploadFieldFile(field, event.target.files?.[0])} />
-              {uploadingField === field.name && <small>Uploading...</small>}
-              {form[field.name] && (
-                <div className="upload-preview">
-                  <img src={mediaSrc(form[field.name])} alt={`${field.label} preview`} />
-                  <span>Photo ready</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <input type={field.type || 'text'} required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
-          )}
-        </label>
-      ))}
+      {fields.map((field) => {
+        const selectedOption = field.type === 'select'
+          ? (field.options || []).find((option) => String(option.value) === String(form[field.name] ?? ''))
+          : null
+        return (
+          <label className="field-control" key={field.name}>
+            <span>{field.label}</span>
+            {field.type === 'select' ? (
+              <>
+                <select required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })}>
+                  <option value="">{field.placeholder || `Select ${field.label}`}</option>
+                  {(field.options || []).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                {selectedOption?.detail && <small className="select-detail">{selectedOption.detail}</small>}
+              </>
+            ) : field.type === 'textarea' ? (
+              <textarea required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
+            ) : field.type === 'file' ? (
+              <>
+                <input type="file" accept={field.accept || 'image/*'} required={field.required !== false && !form[field.name]} onChange={(event) => uploadFieldFile(field, event.target.files?.[0])} />
+                {uploadingField === field.name && <small>Uploading...</small>}
+                {form[field.name] && (
+                  <div className="upload-preview">
+                    <img src={mediaSrc(form[field.name])} alt={`${field.label} preview`} />
+                    <span>Photo ready</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <input type={field.type || 'text'} required={field.required !== false} value={fieldValue(field, form[field.name])} onChange={(event) => setForm({ ...form, [field.name]: event.target.value })} />
+            )}
+          </label>
+        )
+      })}
       <button className="primary" disabled={Boolean(uploadingField)}>{uploadingField ? 'Uploading...' : initialRecord ? 'Update' : 'Save'}</button>
     </form>
   )
@@ -443,37 +479,83 @@ function SiteContentManager({ siteContent, updateSiteContent }) {
 }
 
 function AttendanceView({ data }) {
-  const [selectedClassId, setSelectedClassId] = useState(data.classes[0]?.id || '')
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10))
+  const today = todayValue()
+  const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+  const firstTodayClass = data.classes.find((item) => String(item.day_of_week || '').toLowerCase() === todayName.toLowerCase())
+  const [selectedClassId, setSelectedClassId] = useState(firstTodayClass?.id || data.classes[0]?.id || '')
+  const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedMonth, setSelectedMonth] = useState(monthValue())
   const selectedClass = data.classes.find((item) => String(item.id) === String(selectedClassId))
-  const rows = data.attendance.filter((item) => {
-    const classMatch = !selectedClassId || String(item.class_id) === String(selectedClassId)
-    const dateMatch = !selectedDate || item.date?.slice(0, 10) === selectedDate
-    return classMatch && dateMatch
+  const classRows = data.attendance.filter((item) => !selectedClassId || String(item.class_id) === String(selectedClassId))
+  const selectedDateRows = classRows.filter((item) => sameDate(item.date, selectedDate))
+  const todayRows = classRows.filter((item) => sameDate(item.date, today))
+  const monthDays = calendarDays(selectedMonth)
+  const monthRows = classRows.filter((item) => monthValue(item.date) === selectedMonth)
+  const presentToday = todayRows.filter((item) => item.status === 'present').length
+  const previousRows = classRows.filter((item) => !sameDate(item.date, today))
+  const classAttendanceSummary = data.classes.map((item) => {
+    const rows = data.attendance.filter((record) => String(record.class_id) === String(item.id) && sameDate(record.date, today))
+    return { ...item, todayTotal: rows.length, todayPresent: rows.filter((record) => record.status === 'present').length }
   })
-  const previousRows = data.attendance.filter((item) => !selectedClassId || String(item.class_id) === String(selectedClassId))
+  const rows = selectedDateRows
 
   return (
     <>
       <div className="class-card-grid">
-        {data.classes.map((item) => (
+        {classAttendanceSummary.map((item) => (
           <button key={item.id} type="button" className={String(selectedClassId) === String(item.id) ? 'class-card active' : 'class-card'} onClick={() => setSelectedClassId(item.id)}>
             <strong>{item.course_name}</strong>
             <span>{item.branch_name || 'Branch not set'}</span>
             <small>{item.day_of_week} {item.start_time} - {item.end_time}</small>
+            <small>Today: {item.todayPresent}/{item.todayTotal || 0} present</small>
           </button>
         ))}
       </div>
+      <section className="panel attendance-today-panel">
+        <div className="form-title-row">
+          <div>
+            <span className="eyebrow">Today</span>
+            <h3>{selectedClass ? `${selectedClass.course_name} Attendance` : 'Today Attendance'}</h3>
+            <p className="hint">{today} | {selectedClass?.branch_name || 'Class wise view'} | {presentToday}/{todayRows.length || 0} present</p>
+          </div>
+          <button type="button" onClick={() => {
+            setSelectedDate(today)
+            setSelectedMonth(monthValue(today))
+          }}>Show Today</button>
+        </div>
+        <DataSection compact title="Today Attendance First" rows={todayRows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
+        {!todayRows.length && <p className="empty">No attendance marked for today in this class.</p>}
+      </section>
       <section className="table-section">
         <div className="form-title-row">
-          <h3>{selectedClass ? `${selectedClass.course_name} Attendance` : 'Attendance'}</h3>
+          <div>
+            <h3>Attendance Calendar</h3>
+            <p className="hint">Select any day to view previous attendance for this class.</p>
+          </div>
           <label className="field-control compact-control">
-            <span>Date</span>
-            <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
+            <span>Month</span>
+            <input type="month" value={selectedMonth} onChange={(event) => {
+              setSelectedMonth(event.target.value)
+              setSelectedDate(`${event.target.value}-01`)
+            }} />
           </label>
         </div>
-        <DataSection compact title="Selected Date" rows={rows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
-        <DataSection compact title="Previous Attendance" rows={previousRows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
+        <div className="attendance-calendar">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <span className="calendar-weekday" key={day}>{day}</span>)}
+          {monthDays.map((dateValue, index) => {
+            if (!dateValue) return <span className="calendar-empty" key={`empty-${index}`}></span>
+            const dayRows = monthRows.filter((item) => sameDate(item.date, dateValue))
+            const present = dayRows.filter((item) => item.status === 'present').length
+            return (
+              <button key={dateValue} type="button" className={`${dateValue === selectedDate ? 'active ' : ''}${dateValue === today ? 'today ' : ''}${dayRows.length ? 'has-records' : ''}`} onClick={() => setSelectedDate(dateValue)}>
+                <strong>{Number(dateValue.slice(-2))}</strong>
+                <span>{dayRows.length ? `${present}/${dayRows.length}` : '-'}</span>
+              </button>
+            )
+          })}
+        </div>
+        <DataSection compact title={`Selected Date: ${selectedDate}`} rows={rows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
+        <DataSection compact title="Previous Attendance For This Class" rows={previousRows} columns={['student_name', 'course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
       </section>
     </>
   )
@@ -642,6 +724,41 @@ function EventProgramReport({ data, optionSets }) {
   )
 }
 
+const programReportColumnOptions = {
+  items: [
+    { id: 'display_order', label: 'Order', key: 'display_order' },
+    { id: 'category', label: 'Category', key: 'category' },
+    { id: 'item_title', label: 'Song / Item', key: 'item_title' },
+    { id: 'item_notes', label: 'Notes', key: 'item_notes' },
+  ],
+  participants: [
+    { id: 'student_name', label: 'Student Name', key: 'student_name' },
+    { id: 'team_name', label: 'Team', key: 'team_name' },
+    { id: 'course_name', label: 'Class', key: 'course_name' },
+    { id: 'branch_name', label: 'Branch', key: 'branch_name' },
+    { id: 'grade_name', label: 'Grade', key: 'grade_name' },
+    { id: 'role_name', label: 'Role', key: 'role_name' },
+    { id: 'participation_status', label: 'Status', key: 'participation_status' },
+    { id: 'notes', label: 'Notes', key: 'notes' },
+  ],
+  charges: [
+    { id: 'student_name', label: 'Student Name', key: 'student_name' },
+    { id: 'team_name', label: 'Team', key: 'team_name' },
+    { id: 'charge_type', label: 'Charge Type', key: 'charge_type' },
+    { id: 'amount', label: 'Amount', key: 'amount' },
+    { id: 'paid_amount', label: 'Paid', key: 'paid_amount' },
+    { id: 'due_amount', label: 'Due', key: 'due_amount' },
+    { id: 'status', label: 'Status', key: 'status' },
+    { id: 'notes', label: 'Notes', key: 'notes' },
+  ],
+}
+
+const defaultProgramReportColumns = {
+  items: ['item_title'],
+  participants: ['student_name'],
+  charges: [],
+}
+
 function escapeHtml(value) {
   return String(value ?? '-')
     .replaceAll('&', '&amp;')
@@ -733,10 +850,15 @@ function PrintReportsView({ data, optionSets }) {
   const [classId, setClassId] = useState('')
   const [branchId, setBranchId] = useState('')
   const [eventProgramId, setEventProgramId] = useState((data.event_programs || [])[0]?.id || '')
+  const [programFilters, setProgramFilters] = useState({ team_id: '', class_id: '', branch_id: '', grade_id: '', status: '' })
+  const [programColumns, setProgramColumns] = useState(defaultProgramReportColumns)
   const selectedExam = data.grade_exams.find((exam) => String(exam.id) === String(gradeExamId))
   const selectedClass = data.classes.find((item) => String(item.id) === String(classId))
   const selectedBranch = data.branches.find((item) => String(item.id) === String(branchId))
   const selectedProgram = (data.event_programs || []).find((item) => String(item.id) === String(eventProgramId))
+  const selectedProgramMeta = selectedProgram
+    ? detailLine([selectedProgram.event_date, selectedProgram.event_time, selectedProgram.venue, selectedProgram.branch_name, selectedProgram.status])
+    : ''
 
   const gradeRows = (data.student_academics || [])
     .filter((row) => !selectedExam || Number(row.grade_id) === Number(selectedExam.grade_id))
@@ -786,11 +908,50 @@ function PrintReportsView({ data, optionSets }) {
     })
   }
 
+  function selectedColumns(section) {
+    return programReportColumnOptions[section].filter((column) => programColumns[section]?.includes(column.id))
+  }
+
+  function toggleProgramColumn(section, columnId) {
+    setProgramColumns((current) => {
+      const selected = current[section] || []
+      const next = selected.includes(columnId) ? selected.filter((id) => id !== columnId) : [...selected, columnId]
+      return { ...current, [section]: next }
+    })
+  }
+
+  const programParticipants = (data.event_program_participants || [])
+    .filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    .filter((row) => !programFilters.team_id || Number(row.team_id) === Number(programFilters.team_id))
+    .filter((row) => !programFilters.class_id || Number(row.class_id) === Number(programFilters.class_id))
+    .filter((row) => !programFilters.branch_id || Number(row.branch_id) === Number(programFilters.branch_id))
+    .filter((row) => !programFilters.grade_id || Number(row.grade_id) === Number(programFilters.grade_id))
+    .filter((row) => !programFilters.status || String(row.participation_status || '') === String(programFilters.status))
+  const participantIds = new Set(programParticipants.map((row) => Number(row.id)))
+  const participantStudentIds = new Set(programParticipants.map((row) => Number(row.student_id)))
+  const programItems = (data.event_program_items || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+  const programCharges = (data.event_program_charges || [])
+    .filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    .filter((row) => !programFilters.branch_id || Number(row.branch_id) === Number(programFilters.branch_id))
+    .filter((row) => {
+      if (!programFilters.team_id && !programFilters.class_id && !programFilters.grade_id && !programFilters.status) return true
+      return participantIds.has(Number(row.participant_id)) || participantStudentIds.has(Number(row.student_id))
+    })
+
   function printProgramDetails() {
-    const participants = (data.event_program_participants || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
-    const items = (data.event_program_items || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
-    const teams = (data.event_program_teams || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
-    const charges = (data.event_program_charges || []).filter((row) => Number(row.event_program_id) === Number(eventProgramId))
+    const sections = []
+    const itemColumns = selectedColumns('items')
+    const participantColumns = selectedColumns('participants')
+    const chargeColumns = selectedColumns('charges')
+    if (itemColumns.length) {
+      sections.push({ title: 'Songs / Items', rows: programItems, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...itemColumns] })
+    }
+    if (participantColumns.length) {
+      sections.push({ title: 'Student Details', rows: programParticipants, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...participantColumns] })
+    }
+    if (chargeColumns.length) {
+      sections.push({ title: 'Charges', rows: programCharges, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...chargeColumns] })
+    }
     openPrintableReport({
       title: 'Program Details Report',
       subtitle: selectedProgram?.program_name || 'Selected event program',
@@ -801,29 +962,10 @@ function PrintReportsView({ data, optionSets }) {
         { label: 'Venue', value: selectedProgram?.venue || '-' },
         { label: 'Branch', value: selectedProgram?.branch_name || '-' },
         { label: 'Status', value: selectedProgram?.status || '-' },
+        { label: 'Students', value: programParticipants.length },
+        { label: 'Songs / Items', value: programItems.length },
       ],
-      sections: [
-        {
-          title: 'Program Items / Songs',
-          rows: items,
-          columns: [{ label: 'Order', key: 'display_order' }, { label: 'Category', key: 'category' }, { label: 'Item / Song', key: 'item_title' }, { label: 'Notes', key: 'item_notes' }],
-        },
-        {
-          title: 'Teams',
-          rows: teams,
-          columns: [{ label: 'Team', key: 'team_name' }, { label: 'Staff Incharge', key: 'staff_name' }, { label: 'Notes', key: 'team_notes' }],
-        },
-        {
-          title: 'Participants',
-          rows: participants,
-          columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, { label: 'Student', key: 'student_name' }, { label: 'Team', key: 'team_name' }, { label: 'Class', key: 'course_name' }, { label: 'Branch', key: 'branch_name' }, { label: 'Grade', key: 'grade_name' }, { label: 'Role', key: 'role_name' }, { label: 'Status', key: 'participation_status' }],
-        },
-        {
-          title: 'Charges',
-          rows: charges,
-          columns: [{ label: 'Student', key: 'student_name' }, { label: 'Charge Type', key: 'charge_type' }, { label: 'Amount', key: 'amount' }, { label: 'Paid', key: 'paid_amount' }, { label: 'Due', key: 'due_amount' }, { label: 'Status', key: 'status' }, { label: 'Notes', key: 'notes' }],
-        },
-      ],
+      sections: sections.length ? sections : [{ title: 'Selected Report', rows: [], columns: [] }],
     })
   }
 
@@ -870,10 +1012,43 @@ function PrintReportsView({ data, optionSets }) {
             <option value="">Select Program</option>
             {optionSets.eventPrograms.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
+          {selectedProgramMeta && <small className="select-detail">{selectedProgramMeta}</small>}
         </label>
+        {[
+          { name: 'team_id', label: 'Team', options: optionSets.eventTeams },
+          { name: 'class_id', label: 'Class', options: optionSets.classes },
+          { name: 'branch_id', label: 'Branch', options: optionSets.branches },
+          { name: 'grade_id', label: 'Grade', options: optionSets.grades },
+          { name: 'status', label: 'Participation Status', options: optionSets.participationStatuses },
+        ].map((filter) => (
+          <label className="field-control" key={filter.name}>
+            <span>{filter.label}</span>
+            <select value={programFilters[filter.name]} onChange={(event) => setProgramFilters({ ...programFilters, [filter.name]: event.target.value })}>
+              <option value="">All</option>
+              {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        ))}
+        <div className="report-column-picker">
+          {Object.entries(programReportColumnOptions).map(([section, columns]) => (
+            <fieldset key={section}>
+              <legend>{section.replaceAll('_', ' ')}</legend>
+              <div className="report-column-grid">
+                {columns.map((column) => (
+                  <label key={`${section}-${column.id}`}>
+                    <input type="checkbox" checked={programColumns[section]?.includes(column.id) || false} onChange={() => toggleProgramColumn(section, column.id)} />
+                    <span>{column.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
         <button type="button" className="primary" onClick={printProgramDetails} disabled={!eventProgramId}>Print / Save PDF</button>
-        <p className="hint">Includes program info, items, teams, participants, and charges.</p>
+        <p className="hint">{programItems.length} songs/items and {programParticipants.length} students found for this selection.</p>
       </section>
+      <DataSection compact title="Program Student Preview" rows={programParticipants} columns={selectedColumns('participants').map((column) => column.key)} />
+      <DataSection compact title="Program Song Preview" rows={programItems} columns={selectedColumns('items').map((column) => column.key)} />
       <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />
     </div>
   )
@@ -1018,23 +1193,23 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
   ]
 
   const optionSets = {
-    branches: data.branches.map((branch) => ({ value: branch.id, label: branch.branch_name })),
-    students: data.students.map((student) => ({ value: student.id, label: student.name })),
-    staff: data.staff.map((staff) => ({ value: staff.id, label: staff.name })),
-    courses: data.courses.map((course) => ({ value: course.id, label: course.course_name })),
-    classes: data.classes.map((item) => ({ value: item.id, label: `${item.course_name || 'Class'} - ${item.day_of_week || ''}` })),
-    fees: data.fees.map((fee) => ({ value: fee.id, label: `${fee.student_name || 'Student'} - ${fee.fee_type || 'fee'} - Rs. ${fee.total_amount || fee.amount || 0}` })),
-    programs: data.programs.map((program) => ({ value: program.id, label: program.program_name })),
-    grades: data.grade_levels.map((grade) => ({ value: grade.id, label: grade.grade_name })),
-    universityPrograms: data.university_programs.map((program) => ({ value: program.id, label: `${program.program_name}${program.university_name ? ` - ${program.university_name}` : ''}` })),
-    examBoards: (data.exam_boards || []).map((board) => ({ value: board.id, label: `${board.board_name}${board.board_type ? ` - ${board.board_type}` : ''}` })),
-    gradeExamBoards: (data.exam_boards || []).filter((board) => ['grade', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name })),
-    universityExamBoards: (data.exam_boards || []).filter((board) => ['university', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name })),
-    gradeExams: data.grade_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.grade_name || 'Grade exam'} - ${exam.exam_date || 'No date'}` })),
-    universityExams: data.university_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.exam_name || 'University exam'} - ${exam.exam_date || 'No date'}` })),
-    eventPrograms: (data.event_programs || []).map((program) => ({ value: program.id, label: program.program_name })),
-    eventTeams: (data.event_program_teams || []).map((team) => ({ value: team.id, label: `${team.team_name}${team.program_name ? ` - ${team.program_name}` : ''}` })),
-    eventParticipants: (data.event_program_participants || []).map((item) => ({ value: item.id, label: `${item.student_name || 'Student'} - ${item.program_name || 'Program'}` })),
+    branches: data.branches.map((branch) => ({ value: branch.id, label: branch.branch_name, detail: detailLine([branch.location, branch.phone]) })),
+    students: data.students.map((student) => ({ value: student.id, label: student.name, detail: detailLine([student.branch_name, student.phone, student.parent_name, student.academic_track]) })),
+    staff: data.staff.map((staff) => ({ value: staff.id, label: staff.name, detail: detailLine([staff.specialization, staff.branch_name, staff.phone, staff.account_status]) })),
+    courses: data.courses.map((course) => ({ value: course.id, label: course.course_name, detail: detailLine([course.duration, course.fees ? `Rs. ${course.fees}` : '', course.description]) })),
+    classes: data.classes.map((item) => ({ value: item.id, label: `${item.course_name || 'Class'} - ${item.day_of_week || ''}`, detail: detailLine([item.branch_name, item.staff_name, item.start_time && item.end_time ? `${item.start_time} - ${item.end_time}` : '']) })),
+    fees: data.fees.map((fee) => ({ value: fee.id, label: `${fee.student_name || 'Student'} - ${fee.fee_type || 'fee'} - Rs. ${fee.total_amount || fee.amount || 0}`, detail: detailLine([fee.branch_name, fee.course_name || fee.program_name || fee.grade_name || fee.university_program_name, fee.status, fee.due_amount ? `Due Rs. ${fee.due_amount}` : '']) })),
+    programs: data.programs.map((program) => ({ value: program.id, label: program.program_name, detail: detailLine([program.duration, program.fees ? `Rs. ${program.fees}` : '', program.description]) })),
+    grades: data.grade_levels.map((grade) => ({ value: grade.id, label: grade.grade_name, detail: detailLine([grade.level_order !== undefined ? `Order ${grade.level_order}` : '', grade.description]) })),
+    universityPrograms: data.university_programs.map((program) => ({ value: program.id, label: `${program.program_name}${program.university_name ? ` - ${program.university_name}` : ''}`, detail: detailLine([program.university_name, program.duration, program.fees ? `Rs. ${program.fees}` : '']) })),
+    examBoards: (data.exam_boards || []).map((board) => ({ value: board.id, label: `${board.board_name}${board.board_type ? ` - ${board.board_type}` : ''}`, detail: board.description })),
+    gradeExamBoards: (data.exam_boards || []).filter((board) => ['grade', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name, detail: board.description })),
+    universityExamBoards: (data.exam_boards || []).filter((board) => ['university', 'both'].includes(board.board_type || 'grade')).map((board) => ({ value: board.id, label: board.board_name, detail: board.description })),
+    gradeExams: data.grade_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.grade_name || 'Grade exam'} - ${exam.exam_date || 'No date'}`, detail: detailLine([exam.exam_name, exam.exam_board_name, exam.exam_date]) })),
+    universityExams: data.university_exams.map((exam) => ({ value: exam.id, label: `${exam.exam_board_name || 'Board'} - ${exam.exam_name || 'University exam'} - ${exam.exam_date || 'No date'}`, detail: detailLine([exam.university_program_name, exam.exam_board_name, exam.exam_date]) })),
+    eventPrograms: (data.event_programs || []).map((program) => ({ value: program.id, label: program.program_name, detail: detailLine([program.event_date, program.event_time, program.venue, program.branch_name, program.status]) })),
+    eventTeams: (data.event_program_teams || []).map((team) => ({ value: team.id, label: `${team.team_name}${team.program_name ? ` - ${team.program_name}` : ''}`, detail: detailLine([team.staff_name, team.team_notes]) })),
+    eventParticipants: (data.event_program_participants || []).map((item) => ({ value: item.id, label: `${item.student_name || 'Student'} - ${item.program_name || 'Program'}`, detail: detailLine([item.team_name, item.course_name, item.branch_name, item.grade_name, item.participation_status]) })),
     statuses: ['active', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
     eventStatuses: ['planning', 'confirmed', 'completed', 'cancelled'].map((status) => ({ value: status, label: status })),
     participationStatuses: ['selected', 'confirmed', 'practice', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
