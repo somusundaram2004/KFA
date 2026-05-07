@@ -15,6 +15,13 @@ function formatDateValue(value) {
   return String(value).slice(0, 10)
 }
 
+function formatDisplayDate(value) {
+  const dateText = formatDateValue(value)
+  if (!dateText) return '-'
+  const parsed = new Date(`${dateText}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? dateText : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 function todayValue() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -728,7 +735,7 @@ const programReportColumnOptions = {
   items: [
     { id: 'display_order', label: 'Order', key: 'display_order' },
     { id: 'category', label: 'Category', key: 'category' },
-    { id: 'item_title', label: 'Song / Item', key: 'item_title' },
+    { id: 'item_title', label: 'Song Name', key: 'item_title' },
     { id: 'item_notes', label: 'Notes', key: 'item_notes' },
   ],
   participants: [
@@ -845,6 +852,7 @@ function openPrintableReport({ title, subtitle, meta = [], sections = [] }) {
 }
 
 function PrintReportsView({ data, optionSets }) {
+  const [activeReport, setActiveReport] = useState('')
   const [gradeExamId, setGradeExamId] = useState(data.grade_exams[0]?.id || '')
   const [gradeBoardId, setGradeBoardId] = useState('')
   const [classId, setClassId] = useState('')
@@ -884,7 +892,7 @@ function PrintReportsView({ data, optionSets }) {
       meta: [
         { label: 'Grade', value: selectedExam?.grade_name || 'All grade exams' },
         { label: 'Exam Board', value: selectedExam?.exam_board_name || optionSets.gradeExamBoards.find((board) => String(board.value) === String(gradeBoardId))?.label || 'All boards' },
-        { label: 'Exam Date', value: selectedExam?.exam_date || '-' },
+        { label: 'Exam Date', value: formatDisplayDate(selectedExam?.exam_date) },
         { label: 'Class', value: selectedClass ? `${selectedClass.course_name} | ${selectedClass.day_of_week}` : 'All classes' },
         { label: 'Branch', value: selectedBranch?.branch_name || 'All branches' },
         { label: 'Total Students', value: gradeRows.length },
@@ -943,21 +951,26 @@ function PrintReportsView({ data, optionSets }) {
     const itemColumns = selectedColumns('items')
     const participantColumns = selectedColumns('participants')
     const chargeColumns = selectedColumns('charges')
-    if (itemColumns.length) {
-      sections.push({ title: 'Songs / Items', rows: programItems, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...itemColumns] })
+    const selectedSongNames = programItems.map((item) => item.item_title).filter(Boolean)
+    const needsSongDetailsTable = itemColumns.length && (!participantColumns.length || itemColumns.some((column) => column.id !== 'item_title'))
+    if (needsSongDetailsTable) {
+      sections.push({ title: 'Song Details', rows: programItems, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...itemColumns] })
     }
     if (participantColumns.length) {
-      sections.push({ title: 'Student Details', rows: programParticipants, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...participantColumns] })
+      const songHeadings = selectedSongNames.length ? selectedSongNames : ['Student Details']
+      songHeadings.forEach((songName) => {
+        sections.push({ title: songName, rows: programParticipants, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...participantColumns] })
+      })
     }
     if (chargeColumns.length) {
-      sections.push({ title: 'Charges', rows: programCharges, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...chargeColumns] })
+      sections.push({ title: 'Program Charges', rows: programCharges, columns: [{ label: 'S.No', render: (_row, index) => index + 1 }, ...chargeColumns] })
     }
     openPrintableReport({
-      title: 'Program Details Report',
+      title: 'KFA Music Academy',
       subtitle: selectedProgram?.program_name || 'Selected event program',
       meta: [
         { label: 'Program', value: selectedProgram?.program_name || '-' },
-        { label: 'Date', value: selectedProgram?.event_date || '-' },
+        { label: 'Date', value: formatDisplayDate(selectedProgram?.event_date) },
         { label: 'Time', value: selectedProgram?.event_time || '-' },
         { label: 'Venue', value: selectedProgram?.venue || '-' },
         { label: 'Branch', value: selectedProgram?.branch_name || '-' },
@@ -969,8 +982,35 @@ function PrintReportsView({ data, optionSets }) {
     })
   }
 
+  if (!activeReport) {
+    return (
+      <div className="workspace-card-grid">
+        {[
+          { id: 'grade', title: 'Grade Exam PDF', detail: `${gradeRows.length} students matched` },
+          { id: 'program', title: 'Program PDF', detail: 'Songs, students, charges, and custom columns' },
+        ].map((card) => (
+          <button key={card.id} type="button" className="workspace-card" onClick={() => setActiveReport(card.id)}>
+            <span className="eyebrow">Open report</span>
+            <strong>{card.title}</strong>
+            <small>{card.detail}</small>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard-grid">
+      <section className="panel form-grid report-back-panel">
+        <div className="form-title-row">
+          <div>
+            <span className="eyebrow">Print Reports</span>
+            <h3>{activeReport === 'grade' ? 'Grade Exam PDF' : 'Program PDF'}</h3>
+          </div>
+          <button type="button" onClick={() => setActiveReport('')}>Back To Reports</button>
+        </div>
+      </section>
+      {activeReport === 'grade' && (
       <section className="panel form-grid">
         <h3>Grade Exam Print / PDF</h3>
         <label className="field-control">
@@ -1004,6 +1044,8 @@ function PrintReportsView({ data, optionSets }) {
         <button type="button" className="primary" onClick={printGradeExam}>Print / Save PDF</button>
         <p className="hint">{gradeRows.length} students found for this selection.</p>
       </section>
+      )}
+      {activeReport === 'program' && (
       <section className="panel form-grid">
         <h3>Program Details Print / PDF</h3>
         <label className="field-control">
@@ -1047,9 +1089,10 @@ function PrintReportsView({ data, optionSets }) {
         <button type="button" className="primary" onClick={printProgramDetails} disabled={!eventProgramId}>Print / Save PDF</button>
         <p className="hint">{programItems.length} songs/items and {programParticipants.length} students found for this selection.</p>
       </section>
-      <DataSection compact title="Program Student Preview" rows={programParticipants} columns={selectedColumns('participants').map((column) => column.key)} />
-      <DataSection compact title="Program Song Preview" rows={programItems} columns={selectedColumns('items').map((column) => column.key)} />
-      <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />
+      )}
+      {activeReport === 'program' && <DataSection compact title="Program Student Preview" rows={programParticipants} columns={selectedColumns('participants').map((column) => column.key)} />}
+      {activeReport === 'program' && <DataSection compact title="Program Song Preview" rows={programItems} columns={selectedColumns('items').map((column) => column.key)} />}
+      {activeReport === 'grade' && <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />}
     </div>
   )
 }
@@ -1225,6 +1268,15 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     notificationRoles: ['all', 'admin', 'staff', 'student'].map((role) => ({ value: role, label: role })),
   }
 
+  const programPages = useMemo(() => [
+    { id: 'event-programs', label: 'Event Programs', detail: 'Sudden programs', count: (data.event_programs || []).length },
+    { id: 'event-items', label: 'Program Items', detail: 'Songs and lists', count: (data.event_program_items || []).length },
+    { id: 'event-teams', label: 'Program Teams', detail: 'Team planning', count: (data.event_program_teams || []).length },
+    { id: 'event-participants', label: 'Participants', detail: 'Student teams', count: (data.event_program_participants || []).length },
+    { id: 'event-charges', label: 'Program Charges', detail: 'Fees and vehicle', count: (data.event_program_charges || []).length },
+    { id: 'event-reports', label: 'Program Reports', detail: 'Filtered dues', count: (data.event_program_charges || []).length },
+  ], [data.event_programs, data.event_program_items, data.event_program_teams, data.event_program_participants, data.event_program_charges])
+
   const adminPages = useMemo(() => [
     { id: 'overview', label: 'Overview', detail: 'Today summary' },
     { id: 'site-content', label: 'Site Content', detail: 'Homepage text' },
@@ -1243,19 +1295,14 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     { id: 'results', label: 'Results', detail: 'Marks and result' },
     { id: 'fees', label: 'Fees', detail: 'Advanced billing' },
     { id: 'payments', label: 'Payments', detail: 'Fee collections' },
-    { id: 'event-programs', label: 'Event Programs', detail: 'Sudden programs' },
-    { id: 'event-items', label: 'Program Items', detail: 'Songs and lists' },
-    { id: 'event-teams', label: 'Program Teams', detail: 'Team planning' },
-    { id: 'event-participants', label: 'Participants', detail: 'Student teams' },
-    { id: 'event-charges', label: 'Program Charges', detail: 'Fees and vehicle' },
-    { id: 'event-reports', label: 'Program Reports', detail: 'Filtered dues' },
+    { id: 'program-workspace', label: 'Event Programs', detail: 'Programs and reports' },
     { id: 'print-reports', label: 'Print Reports', detail: 'Exam and program PDF' },
     { id: 'attendance', label: 'Attendance', detail: 'Class attendance' },
     { id: 'notifications', label: 'Notifications', detail: 'Messages' },
     { id: 'enquiries', label: 'Enquiries', detail: 'Lead follow-up' },
   ], [])
 
-  const activeMeta = adminPages.find((page) => page.id === activePage) || adminPages[0]
+  const activeMeta = [...adminPages, ...programPages].find((page) => page.id === activePage) || adminPages[0]
 
   function selectPage(pageId) {
     setActivePage(pageId)
@@ -1591,6 +1638,31 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}
             />
+          )}
+
+          {activePage === 'program-workspace' && (
+            <div className="workspace-card-grid">
+              {programPages.map((page) => (
+                <button key={page.id} type="button" className="workspace-card" onClick={() => selectPage(page.id)}>
+                  <span className="eyebrow">Program area</span>
+                  <strong>{page.label}</strong>
+                  <small>{page.detail}</small>
+                  <em>{page.count} records</em>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {programPages.some((page) => page.id === activePage) && (
+            <section className="panel report-back-panel">
+              <div className="form-title-row">
+                <div>
+                  <span className="eyebrow">Event Programs</span>
+                  <h3>{activeMeta.label}</h3>
+                </div>
+                <button type="button" onClick={() => selectPage('program-workspace')}>Back To Program Cards</button>
+              </div>
+            </section>
           )}
 
           {activePage === 'event-programs' && (

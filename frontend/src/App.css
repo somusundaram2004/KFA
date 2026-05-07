@@ -2079,6 +2079,47 @@ select {
   flex-wrap: wrap;
 }
 
+.workspace-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.workspace-card {
+  display: grid;
+  gap: 9px;
+  min-height: 148px;
+  padding: 18px;
+  border: 1px solid rgba(47, 36, 130, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(47, 36, 130, 0.08), rgba(237, 0, 18, 0.05)),
+    rgba(255, 255, 255, 0.94);
+  color: #171141;
+  text-align: left;
+  box-shadow: 0 16px 36px rgba(35, 29, 84, 0.08);
+}
+
+.workspace-card:hover {
+  border-color: rgba(237, 0, 18, 0.34);
+  transform: translateY(-2px);
+}
+
+.workspace-card strong {
+  font-size: 1.18rem;
+}
+
+.workspace-card small,
+.workspace-card em {
+  color: #625b74;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.report-back-panel {
+  grid-column: 1 / -1;
+}
+
 .report-column-picker {
   grid-column: 1 / -1;
   display: grid;
