@@ -250,6 +250,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       staff,
       courses,
       classes,
+      enrollments,
       batches,
       batch_students,
       enquiries,
@@ -285,6 +286,12 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       query('SELECT st.*, u.name, u.dob, u.email, u.phone, b.branch_name FROM staff st JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = st.branch_id ORDER BY st.id DESC'),
       query('SELECT * FROM courses ORDER BY id DESC'),
       query('SELECT c.*, co.course_name, u.name staff_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id LEFT JOIN staff st ON st.id = c.staff_id LEFT JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = c.branch_id ORDER BY c.id DESC'),
+      query(`SELECT e.*, u.name student_name, co.course_name
+        FROM enrollments e
+        JOIN students s ON s.id = e.student_id
+        JOIN users u ON u.id = s.user_id
+        JOIN courses co ON co.id = e.course_id
+        ORDER BY e.id DESC`),
       query(`SELECT ba.*, co.course_name, br.branch_name, u.name staff_name
         FROM batches ba
         JOIN classes c ON c.id = ba.class_id
@@ -396,6 +403,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       staff,
       courses,
       classes,
+      enrollments,
       batches,
       batch_students,
       enquiries,
@@ -512,11 +520,12 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       event_program_charges: [],
     })
   }
-  const [notifications, programs, grade_levels, university_programs, academics] = await Promise.all([
+  const [notifications, programs, grade_levels, university_programs, exam_boards, academics] = await Promise.all([
     query("SELECT * FROM notifications WHERE role IN ('student', 'all') ORDER BY created_at DESC"),
     query('SELECT * FROM programs ORDER BY id DESC'),
     query('SELECT * FROM grade_levels ORDER BY level_order, id'),
     query('SELECT * FROM university_programs ORDER BY id DESC'),
+    query('SELECT * FROM exam_boards ORDER BY id DESC'),
     query(`SELECT sa.*, u.name student_name, b.branch_name, p.program_name, gl.grade_name, up.program_name university_program_name
       FROM student_academics sa
       JOIN students s ON s.id = sa.student_id
@@ -631,7 +640,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
     LEFT JOIN exam_boards ueb ON ueb.id = ue.exam_board_id
     WHERE ar.student_id = ?
     ORDER BY ar.id DESC`, [studentId])
-  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, batches, batch_students, attendance, fees, payments, notifications, programs, grade_levels, university_programs, event_programs, event_program_items, event_program_participants, event_program_charges })
+  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, batches, batch_students, attendance, fees, payments, notifications, programs, grade_levels, university_programs, exam_boards, event_programs, event_program_items, event_program_participants, event_program_charges })
 }))
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {

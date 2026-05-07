@@ -2834,6 +2834,13 @@ select {
   z-index: 1;
 }
 
+.admin-workspace .batch-page-stack {
+  display: grid;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+
 .admin-workspace .panel,
 .admin-workspace .table-section {
   border-color: rgba(47, 36, 130, 0.1);

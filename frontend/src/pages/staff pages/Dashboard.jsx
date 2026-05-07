@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import DashboardFrame from '../../components/DashboardFrame'
 import DataSection from '../../components/DataSection'
 import StatGrid from '../../components/StatGrid'
@@ -57,6 +57,16 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
   const [newBatchStudent, setNewBatchStudent] = useState({ batch_id: selectedBatchId || '', student_id: '' })
   const selectedBatch = batches.find((item) => String(item.id) === String(selectedBatchId))
   const selectedClass = classes.find((item) => String(item.id) === String(selectedBatch?.class_id))
+  const batchForStudentForm = batches.find((item) => String(item.id) === String(newBatchStudent.batch_id || selectedBatchId))
+  const classForStudentForm = classes.find((item) => String(item.id) === String(batchForStudentForm?.class_id))
+  const eligibleStudentIds = new Set(
+    (data.enrollments || [])
+      .filter((enrollment) => classForStudentForm && String(enrollment.course_id) === String(classForStudentForm.course_id))
+      .map((enrollment) => String(enrollment.student_id)),
+  )
+  const eligibleStudents = batchForStudentForm
+    ? (data.students || []).filter((student) => eligibleStudentIds.has(String(student.id)))
+    : []
   const selectedDay = selectedClass?.day_of_week || 'Class Day'
   const batchAttendance = (data.attendance || []).filter((item) => String(item.batch_id || '') === String(selectedBatchId))
   const todaysAttendance = batchAttendance.filter((item) => item.date === attendanceDate)
@@ -89,6 +99,19 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
   ].filter(Boolean)
 
   const activeMeta = staffPages.find((page) => page.id === activePage) || staffPages[0]
+
+  useEffect(() => {
+    if (!selectedBatchId && batches[0]?.id) {
+      setSelectedBatchId(batches[0].id)
+      setNewBatchStudent((current) => ({ ...current, batch_id: current.batch_id || batches[0].id }))
+    }
+  }, [batches, selectedBatchId])
+
+  useEffect(() => {
+    if (!newBatch.class_id && classes[0]?.id) {
+      setNewBatch((current) => ({ ...current, class_id: classes[0].id }))
+    }
+  }, [classes, newBatch.class_id])
 
   function selectPage(pageId) {
     setActivePage(pageId)
@@ -133,12 +156,13 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
 
   async function addStudentToBatch(event) {
     event.preventDefault()
+    const batchId = newBatchStudent.batch_id || selectedBatchId
     await addRecord('batch_students', {
       ...newBatchStudent,
-      batch_id: newBatchStudent.batch_id || selectedBatchId,
+      batch_id: batchId,
       enrollment_date: todayValue(),
     })
-    setNewBatchStudent({ batch_id: selectedBatchId || '', student_id: '' })
+    setNewBatchStudent({ batch_id: batchId || '', student_id: '' })
   }
 
   return (
@@ -280,17 +304,18 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
                 <h3>Add Student To Batch</h3>
                 <label className="field-control">
                   <span>Batch</span>
-                  <select required value={newBatchStudent.batch_id || selectedBatchId} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, batch_id: event.target.value })}>
+                  <select required value={newBatchStudent.batch_id || selectedBatchId} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, batch_id: event.target.value, student_id: '' })}>
                     <option value="">Select Batch</option>
                     {batches.map((item) => <option key={item.id} value={item.id}>{item.batch_name} - {item.course_name}</option>)}
                   </select>
                 </label>
                 <label className="field-control">
                   <span>Student</span>
-                  <select required value={newBatchStudent.student_id} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, student_id: event.target.value })}>
-                    <option value="">Select Student</option>
-                    {(data.students || []).map((student) => <option key={student.id} value={student.id}>{student.name} - ID {student.id}</option>)}
+                  <select required value={newBatchStudent.student_id} disabled={!batchForStudentForm || !eligibleStudents.length} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, student_id: event.target.value })}>
+                    <option value="">{batchForStudentForm ? 'Select Student' : 'Select batch first'}</option>
+                    {eligibleStudents.map((student) => <option key={student.id} value={student.id}>{student.name} - ID {student.id}</option>)}
                   </select>
+                  {batchForStudentForm && !eligibleStudents.length && <small className="select-detail">No students enrolled in this class course yet.</small>}
                 </label>
                 <button className="primary">Add Student</button>
               </form>

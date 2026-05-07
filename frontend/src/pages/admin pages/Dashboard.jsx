@@ -218,6 +218,141 @@ function ManagedSection({ type, title, fields, rows, columns, filters = [], addR
   )
 }
 
+function BatchStudentSection({ data, optionSets, addRecord, updateRecord, deleteRecord }) {
+  const [editing, setEditing] = useState(null)
+  const [filterState, setFilterState] = useState({})
+  const [form, setForm] = useState({ batch_id: '', student_id: '', enrollment_date: '' })
+  const columns = ['batch_name', 'course_name', 'student_name', 'enrollment_date']
+  const filters = [
+    { name: 'batch_id', label: 'Batch', options: optionSets.batches },
+    { name: 'student_id', label: 'Student', options: optionSets.students },
+  ]
+  const visibleRows = (data.batch_students || []).filter((row) => filters.every((filter) => {
+    const value = filterState[filter.name]
+    if (!value) return true
+    return String(row[filter.name] ?? '') === String(value)
+  }))
+  const selectedBatch = (data.batches || []).find((batch) => String(batch.id) === String(form.batch_id))
+  const selectedClass = selectedBatch ? (data.classes || []).find((item) => String(item.id) === String(selectedBatch.class_id)) : null
+  const enrolledStudentIds = new Set(
+    (data.enrollments || [])
+      .filter((enrollment) => selectedClass && String(enrollment.course_id) === String(selectedClass.course_id))
+      .map((enrollment) => String(enrollment.student_id)),
+  )
+  const studentOptions = selectedBatch
+    ? optionSets.students.filter((student) => enrolledStudentIds.has(String(student.value)))
+    : []
+  const selectedStudent = studentOptions.find((student) => String(student.value) === String(form.student_id))
+  const selectedBatchOption = optionSets.batches.find((batch) => String(batch.value) === String(form.batch_id))
+
+  async function submit(event) {
+    event.preventDefault()
+    const record = cleanRecord(form)
+    if (editing) {
+      await updateRecord('batch_students', editing.id, record)
+      setEditing(null)
+    } else {
+      await addRecord('batch_students', record)
+    }
+    setForm({ batch_id: '', student_id: '', enrollment_date: '' })
+  }
+
+  function edit(row) {
+    setEditing(row)
+    setForm({
+      batch_id: row.batch_id || '',
+      student_id: row.student_id || '',
+      enrollment_date: formatDateValue(row.enrollment_date),
+    })
+  }
+
+  function cancelEdit() {
+    setEditing(null)
+    setForm({ batch_id: '', student_id: '', enrollment_date: '' })
+  }
+
+  return (
+    <>
+      <form className="panel form-grid" onSubmit={submit}>
+        <div className="form-title-row">
+          <h3>{editing ? 'Edit Student Batch' : 'Add Student To Batch'}</h3>
+          {editing && <button type="button" onClick={cancelEdit}>Cancel</button>}
+        </div>
+        <label className="field-control">
+          <span>Batch</span>
+          <select
+            required
+            value={form.batch_id}
+            onChange={(event) => setForm({ ...form, batch_id: event.target.value, student_id: '' })}
+          >
+            <option value="">Select Batch</option>
+            {optionSets.batches.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          {selectedBatchOption?.detail && <small className="select-detail">{selectedBatchOption.detail}</small>}
+        </label>
+        <label className="field-control">
+          <span>Student</span>
+          <select
+            required
+            value={form.student_id}
+            onChange={(event) => setForm({ ...form, student_id: event.target.value })}
+            disabled={!selectedBatch || !studentOptions.length}
+          >
+            <option value="">{selectedBatch ? 'Select Student' : 'Select batch first'}</option>
+            {studentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          {selectedStudent?.detail && <small className="select-detail">{selectedStudent.detail}</small>}
+          {selectedBatch && !studentOptions.length && <small className="select-detail">No students enrolled in this class course yet.</small>}
+        </label>
+        <label className="field-control">
+          <span>Enrollment Date</span>
+          <input type="date" value={form.enrollment_date} onChange={(event) => setForm({ ...form, enrollment_date: event.target.value })} />
+        </label>
+        <button className="primary">{editing ? 'Update' : 'Save'}</button>
+      </form>
+      {!!visibleRows.length && (
+        <section className="table-section">
+          <h3>Student Batches</h3>
+          <div className="filter-bar">
+            {filters.map((filter) => (
+              <label className="field-control" key={filter.name}>
+                <span>{filter.label}</span>
+                <select value={filterState[filter.name] || ''} onChange={(event) => setFilterState({ ...filterState, [filter.name]: event.target.value })}>
+                  <option value="">All</option>
+                  {filter.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {columns.map((column) => <th key={column}>{column.replaceAll('_', ' ')}</th>)}
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row) => (
+                  <tr key={row.id}>
+                    {columns.map((column) => <td key={column}>{formatTableCell(column, row[column])}</td>)}
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" onClick={() => edit(row)}>Edit</button>
+                        <button type="button" onClick={() => deleteRecord('batch_students', row.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
 function AccessManager({ title, rows, roleLabel, updateRecord }) {
   async function setAccess(row, accountStatus) {
     await updateRecord(roleLabel === 'Student' ? 'students' : 'staff', row.id, {
@@ -1517,7 +1652,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
           )}
 
           {activePage === 'batches' && (
-            <div className="dashboard-grid">
+            <div className="batch-page-stack">
               <ManagedSection
                 type="batches"
                 title="Add Batch"
@@ -1536,21 +1671,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
                 updateRecord={updateRecord}
                 deleteRecord={deleteRecord}
               />
-              <ManagedSection
-                type="batch_students"
-                title="Add Student To Batch"
-                fields={[
-                  { name: 'batch_id', label: 'Batch', type: 'select', options: optionSets.batches },
-                  { name: 'student_id', label: 'Student', type: 'select', options: optionSets.students },
-                  { name: 'enrollment_date', label: 'Enrollment Date', type: 'date', required: false },
-                ]}
-                rows={data.batch_students || []}
-                columns={['batch_name', 'course_name', 'student_name', 'enrollment_date']}
-                filters={[{ name: 'batch_id', label: 'Batch', options: optionSets.batches }, { name: 'student_id', label: 'Student', options: optionSets.students }]}
-                addRecord={addRecord}
-                updateRecord={updateRecord}
-                deleteRecord={deleteRecord}
-              />
+              <BatchStudentSection data={data} optionSets={optionSets} addRecord={addRecord} updateRecord={updateRecord} deleteRecord={deleteRecord} />
             </div>
           )}
 
