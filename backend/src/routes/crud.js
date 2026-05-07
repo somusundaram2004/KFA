@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import multer from 'multer'
 import { query } from '../db.js'
 import { requireAuth, allowRoles } from '../middleware/auth.js'
-import { ensureAcademicDetailColumns, ensureAttendanceDetailColumns, ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
+import { ensureAcademicDetailColumns, ensureAttendanceDetailColumns, ensureBatchTables, ensureEventProgramTables, ensureFeeScheduleColumns, ensurePersonPhotoColumns, ensureSiteContentTable } from '../schema-helpers.js'
 import { asyncHandler, dobToPassword, pick } from '../utils.js'
 
 const router = Router()
@@ -16,8 +16,10 @@ const tables = {
   students: ['user_id', 'admission_date', 'parent_name', 'branch_id', 'photo_url', 'account_status'],
   courses: ['course_name', 'description', 'duration', 'fees'],
   classes: ['course_id', 'staff_id', 'branch_id', 'day_of_week', 'start_time', 'end_time'],
+  batches: ['class_id', 'batch_name', 'batch_type', 'start_time', 'end_time', 'staff_id'],
+  batch_students: ['batch_id', 'student_id', 'enrollment_date'],
   enrollments: ['student_id', 'course_id', 'enrollment_date'],
-  attendance: ['student_id', 'class_id', 'date', 'day_of_week', 'attendance_time', 'status'],
+  attendance: ['student_id', 'class_id', 'batch_id', 'date', 'day_of_week', 'attendance_time', 'status'],
   fees: ['student_id', 'branch_id', 'fee_type', 'course_id', 'program_id', 'grade_id', 'university_program_id', 'total_amount', 'paid_amount', 'due_amount', 'status', 'fee_frequency', 'billing_day', 'due_day'],
   payments: ['fee_id', 'amount', 'payment_date'],
   enquiries: ['name', 'phone', 'email', 'course_interested', 'message'],
@@ -223,6 +225,7 @@ router.use(asyncHandler(async (_req, _res, next) => {
   await ensureEventProgramTables()
   await ensureAttendanceDetailColumns()
   await ensureAcademicDetailColumns()
+  await ensureBatchTables()
   next()
 }))
 
@@ -247,6 +250,8 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       staff,
       courses,
       classes,
+      batches,
+      batch_students,
       enquiries,
       attendance,
       fees,
@@ -280,8 +285,32 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       query('SELECT st.*, u.name, u.dob, u.email, u.phone, b.branch_name FROM staff st JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = st.branch_id ORDER BY st.id DESC'),
       query('SELECT * FROM courses ORDER BY id DESC'),
       query('SELECT c.*, co.course_name, u.name staff_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id LEFT JOIN staff st ON st.id = c.staff_id LEFT JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = c.branch_id ORDER BY c.id DESC'),
+      query(`SELECT ba.*, co.course_name, br.branch_name, u.name staff_name
+        FROM batches ba
+        JOIN classes c ON c.id = ba.class_id
+        JOIN courses co ON co.id = c.course_id
+        LEFT JOIN branches br ON br.id = c.branch_id
+        LEFT JOIN staff st ON st.id = ba.staff_id
+        LEFT JOIN users u ON u.id = st.user_id
+        ORDER BY ba.id DESC`),
+      query(`SELECT bs.*, ba.batch_name, ba.batch_type, co.course_name, u.name student_name, s.branch_id
+        FROM batch_students bs
+        JOIN batches ba ON ba.id = bs.batch_id
+        JOIN classes c ON c.id = ba.class_id
+        JOIN courses co ON co.id = c.course_id
+        JOIN students s ON s.id = bs.student_id
+        JOIN users u ON u.id = s.user_id
+        ORDER BY bs.id DESC`),
       query('SELECT * FROM enquiries ORDER BY created_at DESC'),
-      query('SELECT a.*, u.name student_name, co.course_name, b.branch_name FROM attendance a JOIN students s ON s.id = a.student_id JOIN users u ON u.id = s.user_id JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id ORDER BY a.date DESC'),
+      query(`SELECT a.*, u.name student_name, co.course_name, b.branch_name, ba.batch_name, ba.batch_type
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        JOIN users u ON u.id = s.user_id
+        JOIN classes c ON c.id = a.class_id
+        JOIN courses co ON co.id = c.course_id
+        LEFT JOIN branches b ON b.id = c.branch_id
+        LEFT JOIN batches ba ON ba.id = a.batch_id
+        ORDER BY a.date DESC`),
       query(`SELECT f.*, u.name student_name, b.branch_name, co.course_name, p.program_name, gl.grade_name, up.program_name university_program_name
         FROM fees f
         JOIN students s ON s.id = f.student_id
@@ -367,6 +396,8 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       staff,
       courses,
       classes,
+      batches,
+      batch_students,
       enquiries,
       attendance,
       fees,
@@ -375,6 +406,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
       programs,
       grade_levels,
       university_programs,
+      exam_boards,
       student_academics,
       grade_exams,
       university_exams,
@@ -391,8 +423,26 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
   if (role === 'staff') {
     const staffRows = await query('SELECT st.*, u.name, u.email, u.phone, b.branch_name FROM staff st JOIN users u ON u.id = st.user_id LEFT JOIN branches b ON b.id = st.branch_id WHERE st.user_id = ?', [req.user.id])
     const staffId = staffRows[0]?.id
-    const [classes, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants] = await Promise.all([
+    const [classes, batches, batch_students, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants] = await Promise.all([
       query('SELECT c.*, co.course_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE c.staff_id = ?', [staffId]),
+      query(`SELECT ba.*, co.course_name, br.branch_name, u.name staff_name
+        FROM batches ba
+        JOIN classes c ON c.id = ba.class_id
+        JOIN courses co ON co.id = c.course_id
+        LEFT JOIN branches br ON br.id = c.branch_id
+        LEFT JOIN staff st ON st.id = ba.staff_id
+        LEFT JOIN users u ON u.id = st.user_id
+        WHERE ba.staff_id = ? OR c.staff_id = ?
+        ORDER BY ba.id DESC`, [staffId, staffId]),
+      query(`SELECT bs.*, ba.batch_name, ba.batch_type, co.course_name, u.name student_name
+        FROM batch_students bs
+        JOIN batches ba ON ba.id = bs.batch_id
+        JOIN classes c ON c.id = ba.class_id
+        JOIN courses co ON co.id = c.course_id
+        JOIN students s ON s.id = bs.student_id
+        JOIN users u ON u.id = s.user_id
+        WHERE ba.staff_id = ? OR c.staff_id = ?
+        ORDER BY u.name`, [staffId, staffId]),
       query('SELECT s.*, u.name, u.email, u.phone FROM students s JOIN users u ON u.id = s.user_id ORDER BY u.name'),
       query(`SELECT e.*, u.name student_name, co.course_name
         FROM enrollments e
@@ -401,15 +451,16 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         JOIN courses co ON co.id = e.course_id
         WHERE e.course_id IN (SELECT course_id FROM classes WHERE staff_id = ?)
         ORDER BY u.name`, [staffId]),
-      query(`SELECT a.*, u.name student_name, co.course_name, b.branch_name
+      query(`SELECT a.*, u.name student_name, co.course_name, b.branch_name, ba.batch_name, ba.batch_type
         FROM attendance a
         JOIN students s ON s.id = a.student_id
         JOIN users u ON u.id = s.user_id
         JOIN classes c ON c.id = a.class_id
         JOIN courses co ON co.id = c.course_id
         LEFT JOIN branches b ON b.id = c.branch_id
-        WHERE c.staff_id = ?
-        ORDER BY a.date DESC, a.id DESC`, [staffId]),
+        LEFT JOIN batches ba ON ba.id = a.batch_id
+        WHERE c.staff_id = ? OR ba.staff_id = ?
+        ORDER BY a.date DESC, a.id DESC`, [staffId, staffId]),
       query("SELECT * FROM notifications WHERE role IN ('staff', 'all') ORDER BY created_at DESC"),
       query(`SELECT DISTINCT ep.*, b.branch_name
         FROM event_programs ep
@@ -432,7 +483,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
         WHERE ept.staff_id = ? OR epp.branch_id IN (SELECT branch_id FROM staff WHERE id = ?)
         ORDER BY epp.id DESC`, [staffId, staffId]),
     ])
-    return res.json({ staff: staffRows, classes, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants })
+    return res.json({ staff: staffRows, classes, batches, batch_students, students, enrollments, attendance, notifications, event_programs, event_program_items, event_program_teams, event_program_participants })
   }
 
   const studentRows = await query(`SELECT s.*, u.name, u.dob, u.email, u.phone, b.branch_name
@@ -501,10 +552,31 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
     })
   }
 
-  const [enrollments, schedule, attendance, fees, payments, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
+  const [enrollments, schedule, batches, batch_students, attendance, fees, payments, event_programs, event_program_items, event_program_participants, event_program_charges] = await Promise.all([
     query('SELECT e.*, co.course_name FROM enrollments e JOIN courses co ON co.id = e.course_id WHERE e.student_id = ?', [studentId]),
     query('SELECT c.*, co.course_name, b.branch_name FROM classes c JOIN courses co ON co.id = c.course_id JOIN enrollments e ON e.course_id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE e.student_id = ?', [studentId]),
-    query('SELECT a.*, co.course_name, b.branch_name FROM attendance a JOIN classes c ON c.id = a.class_id JOIN courses co ON co.id = c.course_id LEFT JOIN branches b ON b.id = c.branch_id WHERE a.student_id = ?', [studentId]),
+    query(`SELECT DISTINCT ba.*, co.course_name, br.branch_name
+      FROM batches ba
+      JOIN batch_students bs ON bs.batch_id = ba.id
+      JOIN classes c ON c.id = ba.class_id
+      JOIN courses co ON co.id = c.course_id
+      LEFT JOIN branches br ON br.id = c.branch_id
+      WHERE bs.student_id = ?
+      ORDER BY ba.id DESC`, [studentId]),
+    query(`SELECT bs.*, ba.batch_name, ba.batch_type, co.course_name
+      FROM batch_students bs
+      JOIN batches ba ON ba.id = bs.batch_id
+      JOIN classes c ON c.id = ba.class_id
+      JOIN courses co ON co.id = c.course_id
+      WHERE bs.student_id = ?
+      ORDER BY bs.id DESC`, [studentId]),
+    query(`SELECT a.*, co.course_name, b.branch_name, ba.batch_name, ba.batch_type
+      FROM attendance a
+      JOIN classes c ON c.id = a.class_id
+      JOIN courses co ON co.id = c.course_id
+      LEFT JOIN branches b ON b.id = c.branch_id
+      LEFT JOIN batches ba ON ba.id = a.batch_id
+      WHERE a.student_id = ?`, [studentId]),
     query(`SELECT f.*, u.name student_name, b.branch_name, co.course_name, p.program_name, gl.grade_name, up.program_name university_program_name
       FROM fees f
       JOIN students s ON s.id = f.student_id
@@ -559,7 +631,7 @@ router.get('/me/dashboard', asyncHandler(async (req, res) => {
     LEFT JOIN exam_boards ueb ON ueb.id = ue.exam_board_id
     WHERE ar.student_id = ?
     ORDER BY ar.id DESC`, [studentId])
-  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, attendance, fees, payments, notifications, programs, grade_levels, university_programs, event_programs, event_program_items, event_program_participants, event_program_charges })
+  res.json({ students: studentRows, student_academics: academics, academic_results: results, enrollments, schedule, batches, batch_students, attendance, fees, payments, notifications, programs, grade_levels, university_programs, event_programs, event_program_items, event_program_participants, event_program_charges })
 }))
 
 router.post('/students/full', adminOnly, asyncHandler(async (req, res) => {
@@ -748,7 +820,11 @@ function normalizeFee(body) {
 }
 
 for (const [table, fields] of Object.entries(tables)) {
-  const guard = table === 'attendance' ? allowRoles('admin', 'staff') : table === 'fees' ? allowRoles('admin', 'student') : adminOnly
+  const guard = table === 'attendance' || table === 'batches' || table === 'batch_students'
+    ? allowRoles('admin', 'staff')
+    : table === 'fees'
+      ? allowRoles('admin', 'student')
+      : adminOnly
 
   router.get(`/${table}`, table === 'notifications' ? allowRoles('admin', 'staff', 'student') : guard, asyncHandler(async (_req, res) => {
     res.json(await query(`SELECT * FROM ${table} ORDER BY id DESC`))

@@ -11,7 +11,16 @@ async function parseResponse(response) {
     } catch {
       detail = {}
     }
-    throw new Error(detail.message || 'Image request failed')
+    const error = new Error(detail.message || 'Image request failed')
+    error.status = response.status
+    if (response.status === 401) {
+      localStorage.removeItem('kfa_token')
+      localStorage.removeItem('token')
+      localStorage.removeItem('kfa_session')
+      localStorage.removeItem('user')
+      window.dispatchEvent(new CustomEvent('kfa:auth-expired'))
+    }
+    throw error
   }
 
   return response.json()

@@ -147,11 +147,16 @@ function StudentAlerts({ notifications, due }) {
 export default function StudentDashboard({ data, session, onSaveAcademicDetails, sidebarOpen, setSidebarOpen }) {
   const workspaceRef = useRef(null)
   const [activePage, setActivePage] = useState('overview')
+  const [attendanceFilters, setAttendanceFilters] = useState({ batch_id: '', date: '' })
   const student = (data.students || []).find((item) => Number(item.user_id) === Number(session.id)) || (data.students || []).find((item) => item.name === session.name)
   const academics = (data.student_academics || []).filter((item) => Number(item.student_id) === Number(student?.id))
   const currentAcademic = academics[0]
   const academicDetailsComplete = hasRequiredAcademicDetails(currentAcademic)
   const attendance = (data.attendance || []).filter((item) => Number(item.student_id) === Number(student?.id))
+  const studentBatches = data.batches || []
+  const filteredAttendance = attendance
+    .filter((item) => !attendanceFilters.batch_id || Number(item.batch_id) === Number(attendanceFilters.batch_id))
+    .filter((item) => !attendanceFilters.date || String(item.date || '').slice(0, 10) === attendanceFilters.date)
   const fees = (data.fees || []).filter((item) => Number(item.student_id) === Number(student?.id)).map((fee) => ({
     ...fee,
     fee_show_date: fee.fee_frequency === 'one-time' ? '-' : monthlyDate(fee.billing_day || 1),
@@ -271,7 +276,25 @@ export default function StudentDashboard({ data, session, onSaveAcademicDetails,
           )}
 
           {activePage === 'programs' && <DataSection title="My Academic Program" rows={academics} columns={['academic_track', 'program_name', 'grade_name', 'university_program_name', 'other_exam_name', 'start_date', 'status']} />}
-          {activePage === 'attendance' && <DataSection title="Attendance" rows={attendance} columns={['course_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />}
+          {activePage === 'attendance' && (
+            <>
+              <section className="panel form-grid">
+                <h3>Attendance Filters</h3>
+                <label className="field-control">
+                  <span>Batch</span>
+                  <select value={attendanceFilters.batch_id} onChange={(event) => setAttendanceFilters({ ...attendanceFilters, batch_id: event.target.value })}>
+                    <option value="">All Batches</option>
+                    {studentBatches.map((batch) => <option key={batch.id} value={batch.id}>{batch.batch_name} - {batch.course_name}</option>)}
+                  </select>
+                </label>
+                <label className="field-control">
+                  <span>Date</span>
+                  <input type="date" value={attendanceFilters.date} onChange={(event) => setAttendanceFilters({ ...attendanceFilters, date: event.target.value })} />
+                </label>
+              </section>
+              <DataSection title="Attendance" rows={filteredAttendance} columns={['course_name', 'batch_name', 'branch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />
+            </>
+          )}
 
           {activePage === 'fees' && (
             <>

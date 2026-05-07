@@ -6,6 +6,7 @@ let eventProgramTablesReady
 let attendanceDetailColumnsReady
 let galleryTableReady
 let academicDetailColumnsReady
+let batchTablesReady
 
 async function hasColumn(table, column) {
   const rows = await query('SELECT COUNT(*) total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?', [table, column])
@@ -126,6 +127,34 @@ export async function ensureAcademicDetailColumns() {
     })()
   }
   return academicDetailColumnsReady
+}
+
+export async function ensureBatchTables() {
+  if (!batchTablesReady) {
+    batchTablesReady = (async () => {
+      await query(`CREATE TABLE IF NOT EXISTS batches (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        class_id INT NOT NULL,
+        batch_name VARCHAR(120) NOT NULL,
+        batch_type VARCHAR(20) DEFAULT 'weekday',
+        start_time TIME NULL,
+        end_time TIME NULL,
+        staff_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`)
+      await query(`CREATE TABLE IF NOT EXISTS batch_students (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        batch_id INT NOT NULL,
+        student_id INT NOT NULL,
+        enrollment_date DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`)
+      if (!(await hasColumn('attendance', 'batch_id'))) {
+        await query('ALTER TABLE attendance ADD COLUMN batch_id INT NULL')
+      }
+    })()
+  }
+  return batchTablesReady
 }
 
 export async function ensureEventProgramTables() {

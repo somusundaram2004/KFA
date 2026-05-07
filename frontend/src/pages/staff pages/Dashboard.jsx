@@ -49,15 +49,22 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
   const workspaceRef = useRef(null)
   const staff = (data.staff || []).find((item) => Number(item.user_id) === Number(session.id)) || (data.staff || []).find((item) => item.name === session.name)
   const classes = (data.classes || []).filter((item) => Number(item.staff_id) === Number(staff?.id) || item.staff_name === staff?.name)
+  const batches = (data.batches || []).filter((item) => Number(item.staff_id) === Number(staff?.id) || classes.some((classRow) => Number(classRow.id) === Number(item.class_id)))
   const [activePage, setActivePage] = useState('overview')
-  const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '')
+  const [selectedBatchId, setSelectedBatchId] = useState(batches[0]?.id || '')
   const [attendanceDate, setAttendanceDate] = useState(todayValue())
-  const selectedClass = classes.find((item) => String(item.id) === String(selectedClassId))
+  const [newBatch, setNewBatch] = useState({ class_id: classes[0]?.id || '', batch_name: '', batch_type: 'weekday', start_time: '', end_time: '' })
+  const [newBatchStudent, setNewBatchStudent] = useState({ batch_id: selectedBatchId || '', student_id: '' })
+  const selectedBatch = batches.find((item) => String(item.id) === String(selectedBatchId))
+  const selectedClass = classes.find((item) => String(item.id) === String(selectedBatch?.class_id))
   const selectedDay = selectedClass?.day_of_week || 'Class Day'
-  const classAttendance = (data.attendance || []).filter((item) => String(item.class_id) === String(selectedClassId))
-  const todaysAttendance = classAttendance.filter((item) => item.date === attendanceDate)
-  const enrolledStudentIds = (data.enrollments || []).filter((item) => Number(item.course_id) === Number(selectedClass?.course_id)).map((item) => Number(item.student_id))
-  const roster = (data.students || []).filter((student) => enrolledStudentIds.length ? enrolledStudentIds.includes(Number(student.id)) : Number(student.branch_id || selectedClass?.branch_id) === Number(selectedClass?.branch_id || student.branch_id))
+  const batchAttendance = (data.attendance || []).filter((item) => String(item.batch_id || '') === String(selectedBatchId))
+  const todaysAttendance = batchAttendance.filter((item) => item.date === attendanceDate)
+  const batchStudentRows = (data.batch_students || []).filter((item) => String(item.batch_id) === String(selectedBatchId))
+  const roster = batchStudentRows.map((row) => {
+    const student = (data.students || []).find((item) => Number(item.id) === Number(row.student_id))
+    return student ? { ...student, student_code: row.student_id } : null
+  }).filter(Boolean)
   const presentCount = todaysAttendance.filter((item) => item.status === 'present').length
   const eventPrograms = data.event_programs || []
   const eventTeams = data.event_program_teams || []
@@ -66,7 +73,7 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
   const notifications = (data.notifications || []).filter((item) => ['staff', 'all'].includes(item.role))
   const hasEvents = hasRows(eventPrograms) || hasRows(eventTeams) || hasRows(eventItems) || hasRows(eventParticipants)
   const stats = [
-    ['Assigned Classes', classes.length],
+    ['Assigned Batches', batches.length],
     selectedClass && ['Marked Present', `${presentCount}/${roster.length}`],
     hasEvents && ['Event Programs', eventPrograms.length],
     ['Alerts', notifications.length],
@@ -74,7 +81,8 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
 
   const staffPages = [
     { id: 'overview', label: 'Overview', detail: 'Today summary' },
-    hasRows(classes) && { id: 'attendance', label: 'Attendance', detail: 'Mark class attendance' },
+    { id: 'attendance', label: 'Attendance', detail: 'Mark batch attendance' },
+    { id: 'batches', label: 'Batches', detail: 'Create and enroll' },
     hasRows(classes) && { id: 'classes', label: 'Classes', detail: 'Assigned timetable' },
     hasEvents && { id: 'events', label: 'Programs', detail: 'Event duties' },
     { id: 'alerts', label: 'Alerts', detail: 'Notifications' },
@@ -99,10 +107,11 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
     const existing = attendanceFor(studentId)
     const record = {
       student_id: studentId,
-      class_id: selectedClassId,
+      class_id: selectedBatch?.class_id,
+      batch_id: selectedBatchId,
       date: attendanceDate,
       day_of_week: selectedClass?.day_of_week || new Date(attendanceDate).toLocaleDateString('en-US', { weekday: 'long' }),
-      attendance_time: selectedClass?.start_time || new Date().toTimeString().slice(0, 5),
+      attendance_time: selectedBatch?.start_time || selectedClass?.start_time || new Date().toTimeString().slice(0, 5),
       status,
     }
     if (existing) {
@@ -110,6 +119,26 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
       return
     }
     markAttendance(record)
+  }
+
+  async function createBatch(event) {
+    event.preventDefault()
+    const saved = {
+      ...newBatch,
+      staff_id: staff?.id,
+    }
+    await addRecord('batches', saved)
+    setNewBatch({ class_id: classes[0]?.id || '', batch_name: '', batch_type: 'weekday', start_time: '', end_time: '' })
+  }
+
+  async function addStudentToBatch(event) {
+    event.preventDefault()
+    await addRecord('batch_students', {
+      ...newBatchStudent,
+      batch_id: newBatchStudent.batch_id || selectedBatchId,
+      enrollment_date: todayValue(),
+    })
+    setNewBatchStudent({ batch_id: selectedBatchId || '', student_id: '' })
   }
 
   return (
@@ -152,7 +181,7 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
                 </div>
               </section>
               <StatGrid stats={stats} />
-              {!classes.length && <AlertList notifications={[{ id: 'no-classes', title: 'No classes assigned', message: 'Assigned classes will appear here after admin updates the timetable.' }, ...notifications]} />}
+              {!batches.length && <AlertList notifications={[{ id: 'no-batches', title: 'No batches assigned', message: 'Assigned batches will appear here after admin or staff creates them.' }, ...notifications]} />}
               {!!notifications.length && <AlertList notifications={notifications.slice(0, 3)} />}
             </>
           )}
@@ -160,28 +189,35 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
           {activePage === 'attendance' && (
             <>
               <div className="class-card-grid day-card-grid">
-                {classes.map((item) => (
-                  <button key={item.id} type="button" className={String(selectedClassId) === String(item.id) ? 'class-card day-card active' : 'class-card day-card'} onClick={() => setSelectedClassId(item.id)}>
-                    <span>{item.day_of_week || 'Class Day'}</span>
+                {batches.map((item) => (
+                  <button key={item.id} type="button" className={String(selectedBatchId) === String(item.id) ? 'class-card day-card active' : 'class-card day-card'} onClick={() => {
+                    setSelectedBatchId(item.id)
+                    setNewBatchStudent((current) => ({ ...current, batch_id: item.id }))
+                  }}>
+                    <span>{item.batch_type || 'weekday'}</span>
                     <strong>{item.course_name}</strong>
+                    <span>{item.batch_name}</span>
                     <span>{item.branch_name || 'KFA Branch'}</span>
                     <small>{formatTime(item.start_time)} - {formatTime(item.end_time)}</small>
+                    <small>{(data.batch_students || []).filter((row) => Number(row.batch_id) === Number(item.id)).length} students</small>
                   </button>
                 ))}
               </div>
               <section className="panel attendance-roster-panel">
                 <div className="form-title-row">
                   <div>
-                    <h3>{selectedClass ? `${selectedDay}: ${selectedClass.course_name}` : 'Attendance'}</h3>
-                    <p className="hint">{selectedClass ? `${selectedClass.branch_name || 'KFA Branch'} | ${formatTime(selectedClass.start_time)} - ${formatTime(selectedClass.end_time)}` : 'Choose a day card to view students.'}</p>
+                    <h3>{selectedBatch ? `${selectedBatch.batch_name}: ${selectedBatch.course_name}` : 'Attendance'}</h3>
+                    <p className="hint">{selectedBatch ? `${selectedBatch.batch_type || 'weekday'} | ${selectedBatch.branch_name || 'KFA Branch'} | ${formatTime(selectedBatch.start_time)} - ${formatTime(selectedBatch.end_time)}` : 'Choose a batch card to view students.'}</p>
                   </div>
                   <label className="field-control compact-control">
                     <span>Date</span>
                     <input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} />
                   </label>
                 </div>
-                {!roster.length ? (
-                  <p className="empty">No students found for this class yet.</p>
+                {!selectedBatch ? (
+                  <p className="empty">No batch selected yet.</p>
+                ) : !roster.length ? (
+                  <p className="empty">No students enrolled in this batch yet.</p>
                 ) : (
                   <div className="attendance-roster">
                     {roster.map((student) => {
@@ -191,6 +227,7 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
                         <article className={isPresent ? 'attendance-student present' : 'attendance-student'} key={student.id}>
                           <div>
                             <strong>{student.name}</strong>
+                            <span>ID: {student.id}</span>
                             {(student.phone || student.email) && <span>{student.phone || student.email}</span>}
                           </div>
                           <button type="button" className={isPresent ? 'present-toggle is-on' : 'present-toggle'} onClick={() => setAttendance(student.id, isPresent ? 'absent' : 'present')} aria-pressed={isPresent}>
@@ -203,8 +240,62 @@ export default function StaffDashboard({ data, session, markAttendance, addRecor
                   </div>
                 )}
               </section>
-              {!!classAttendance.length && <DataSection title="Class Attendance History" rows={classAttendance} columns={['student_name', 'course_name', 'date', 'day_of_week', 'attendance_time', 'status']} />}
+              {!!batchAttendance.length && <DataSection title="Batch Attendance History" rows={batchAttendance} columns={['student_name', 'course_name', 'batch_name', 'date', 'day_of_week', 'attendance_time', 'status']} />}
             </>
+          )}
+
+          {activePage === 'batches' && (
+            <div className="dashboard-grid">
+              <form className="panel form-grid" onSubmit={createBatch}>
+                <h3>Create Batch</h3>
+                <label className="field-control">
+                  <span>Class</span>
+                  <select required value={newBatch.class_id} onChange={(event) => setNewBatch({ ...newBatch, class_id: event.target.value })}>
+                    <option value="">Select Class</option>
+                    {classes.map((item) => <option key={item.id} value={item.id}>{item.course_name} - {item.day_of_week}</option>)}
+                  </select>
+                </label>
+                <label className="field-control">
+                  <span>Batch Name</span>
+                  <input required value={newBatch.batch_name} onChange={(event) => setNewBatch({ ...newBatch, batch_name: event.target.value })} />
+                </label>
+                <label className="field-control">
+                  <span>Type</span>
+                  <select value={newBatch.batch_type} onChange={(event) => setNewBatch({ ...newBatch, batch_type: event.target.value })}>
+                    <option value="weekday">Weekday</option>
+                    <option value="weekend">Weekend</option>
+                  </select>
+                </label>
+                <label className="field-control">
+                  <span>Start Time</span>
+                  <input required type="time" value={newBatch.start_time} onChange={(event) => setNewBatch({ ...newBatch, start_time: event.target.value })} />
+                </label>
+                <label className="field-control">
+                  <span>End Time</span>
+                  <input required type="time" value={newBatch.end_time} onChange={(event) => setNewBatch({ ...newBatch, end_time: event.target.value })} />
+                </label>
+                <button className="primary">Save Batch</button>
+              </form>
+              <form className="panel form-grid" onSubmit={addStudentToBatch}>
+                <h3>Add Student To Batch</h3>
+                <label className="field-control">
+                  <span>Batch</span>
+                  <select required value={newBatchStudent.batch_id || selectedBatchId} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, batch_id: event.target.value })}>
+                    <option value="">Select Batch</option>
+                    {batches.map((item) => <option key={item.id} value={item.id}>{item.batch_name} - {item.course_name}</option>)}
+                  </select>
+                </label>
+                <label className="field-control">
+                  <span>Student</span>
+                  <select required value={newBatchStudent.student_id} onChange={(event) => setNewBatchStudent({ ...newBatchStudent, student_id: event.target.value })}>
+                    <option value="">Select Student</option>
+                    {(data.students || []).map((student) => <option key={student.id} value={student.id}>{student.name} - ID {student.id}</option>)}
+                  </select>
+                </label>
+                <button className="primary">Add Student</button>
+              </form>
+              <DataSection title="My Batches" rows={batches.map((batch) => ({ ...batch, student_count: (data.batch_students || []).filter((row) => Number(row.batch_id) === Number(batch.id)).length }))} columns={['course_name', 'batch_name', 'batch_type', 'start_time', 'end_time', 'student_count']} />
+            </div>
           )}
 
           {activePage === 'classes' && <DataSection title="Assigned Classes" rows={classes} columns={['course_name', 'branch_name', 'day_of_week', 'start_time', 'end_time']} />}

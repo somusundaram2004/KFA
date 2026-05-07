@@ -1238,6 +1238,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     ['Students', data.students.length],
     ['Staff', data.staff.length],
     ['Classes', data.classes.length],
+    ['Batches', (data.batches || []).length],
     ['Programs', data.programs.length],
     ['Grades', data.grade_levels.length],
     ['University Programs', data.university_programs.length],
@@ -1257,6 +1258,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     staff: data.staff.map((staff) => ({ value: staff.id, label: staff.name, detail: detailLine([staff.specialization, staff.branch_name, staff.phone, staff.account_status]) })),
     courses: data.courses.map((course) => ({ value: course.id, label: course.course_name, detail: detailLine([course.duration, course.fees ? `Rs. ${course.fees}` : '', course.description]) })),
     classes: data.classes.map((item) => ({ value: item.id, label: `${item.course_name || 'Class'} - ${item.day_of_week || ''}`, detail: detailLine([item.branch_name, item.staff_name, item.start_time && item.end_time ? `${item.start_time} - ${item.end_time}` : '']) })),
+    batches: (data.batches || []).map((batch) => ({ value: batch.id, label: `${batch.batch_name} - ${batch.course_name || 'Class'}`, detail: detailLine([batch.batch_type, batch.branch_name, batch.staff_name, batch.start_time && batch.end_time ? `${batch.start_time} - ${batch.end_time}` : '']) })),
     fees: data.fees.map((fee) => ({ value: fee.id, label: `${fee.student_name || 'Student'} - ${fee.fee_type || 'fee'} - Rs. ${fee.total_amount || fee.amount || 0}`, detail: detailLine([fee.branch_name, fee.course_name || fee.program_name || fee.grade_name || fee.university_program_name, fee.status, fee.due_amount ? `Due Rs. ${fee.due_amount}` : '']) })),
     programs: data.programs.map((program) => ({ value: program.id, label: program.program_name, detail: detailLine([program.duration, program.fees ? `Rs. ${program.fees}` : '', program.description]) })),
     grades: data.grade_levels.map((grade) => ({ value: grade.id, label: grade.grade_name, detail: detailLine([grade.level_order !== undefined ? `Order ${grade.level_order}` : '', grade.description]) })),
@@ -1274,6 +1276,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     participationStatuses: ['selected', 'confirmed', 'practice', 'completed', 'dropped'].map((status) => ({ value: status, label: status })),
     resultStatuses: ['pass', 'fail'].map((status) => ({ value: status, label: status })),
     attendanceStatuses: ['present', 'absent'].map((status) => ({ value: status, label: status })),
+    batchTypes: ['weekday', 'weekend'].map((type) => ({ value: type, label: type })),
     feeTypes: ['course', 'program', 'grade', 'university', 'monthly'].map((type) => ({ value: type, label: type })),
     feeFrequencies: ['monthly', 'one-time'].map((type) => ({ value: type, label: type })),
     chargeTypes: ['program fee', 'vehicle charge', 'costume charge', 'food charge', 'specific charge', 'other'].map((type) => ({ value: type, label: type })),
@@ -1303,6 +1306,7 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
     { id: 'manage-staff', label: 'Manage Staff', detail: 'Staff login access' },
     { id: 'courses', label: 'Courses', detail: 'Course fees' },
     { id: 'classes', label: 'Classes', detail: 'Branch timetable' },
+    { id: 'batches', label: 'Batches', detail: 'Batch timings' },
     { id: 'media', label: 'Gallery', detail: 'Website photos' },
     { id: 'programs', label: 'Programs', detail: 'Crayons, oil pastels' },
     { id: 'grades', label: 'Grade Levels', detail: 'Pre-grade and grades' },
@@ -1510,6 +1514,44 @@ export default function AdminDashboard({ data, addRecord, updateRecord, deleteRe
               updateRecord={updateRecord}
               deleteRecord={deleteRecord}
             />
+          )}
+
+          {activePage === 'batches' && (
+            <div className="dashboard-grid">
+              <ManagedSection
+                type="batches"
+                title="Add Batch"
+                fields={[
+                  { name: 'class_id', label: 'Class', type: 'select', options: optionSets.classes },
+                  { name: 'batch_name', label: 'Batch Name' },
+                  { name: 'batch_type', label: 'Type', type: 'select', options: optionSets.batchTypes },
+                  { name: 'start_time', label: 'Start Time', type: 'time' },
+                  { name: 'end_time', label: 'End Time', type: 'time' },
+                  { name: 'staff_id', label: 'Assigned Teacher', type: 'select', options: optionSets.staff },
+                ]}
+                rows={data.batches || []}
+                columns={['course_name', 'batch_name', 'batch_type', 'start_time', 'end_time', 'staff_name', 'branch_name']}
+                filters={[{ name: 'class_id', label: 'Class', options: optionSets.classes }, { name: 'staff_id', label: 'Teacher', options: optionSets.staff }, { name: 'batch_type', label: 'Type', options: optionSets.batchTypes }]}
+                addRecord={addRecord}
+                updateRecord={updateRecord}
+                deleteRecord={deleteRecord}
+              />
+              <ManagedSection
+                type="batch_students"
+                title="Add Student To Batch"
+                fields={[
+                  { name: 'batch_id', label: 'Batch', type: 'select', options: optionSets.batches },
+                  { name: 'student_id', label: 'Student', type: 'select', options: optionSets.students },
+                  { name: 'enrollment_date', label: 'Enrollment Date', type: 'date', required: false },
+                ]}
+                rows={data.batch_students || []}
+                columns={['batch_name', 'course_name', 'student_name', 'enrollment_date']}
+                filters={[{ name: 'batch_id', label: 'Batch', options: optionSets.batches }, { name: 'student_id', label: 'Student', options: optionSets.students }]}
+                addRecord={addRecord}
+                updateRecord={updateRecord}
+                deleteRecord={deleteRecord}
+              />
+            </div>
           )}
 
           {activePage === 'media' && (

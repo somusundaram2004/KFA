@@ -228,6 +228,7 @@ function App() {
     const universityProgram = source.university_programs?.find((item) => Number(item.id) === Number(record.university_program_id))
     const examBoard = source.exam_boards?.find((item) => Number(item.id) === Number(record.exam_board_id))
     const classRow = source.classes?.find((item) => Number(item.id) === Number(record.class_id))
+    const batch = source.batches?.find((item) => Number(item.id) === Number(record.batch_id))
     const fee = source.fees?.find((item) => Number(item.id) === Number(record.fee_id))
     const gradeExam = source.grade_exams?.find((item) => Number(item.id) === Number(record.grade_exam_id))
     const universityExam = source.university_exams?.find((item) => Number(item.id) === Number(record.university_exam_id))
@@ -247,6 +248,13 @@ function App() {
     if (classRow) {
       next.course_name ||= classRow.course_name
       next.branch_name ||= classRow.branch_name
+    }
+    if (batch) {
+      next.batch_name = batch.batch_name
+      next.batch_type = batch.batch_type
+      next.course_name ||= batch.course_name
+      next.branch_name ||= batch.branch_name
+      next.class_id ||= batch.class_id
     }
     if (fee) {
       next.student_name ||= fee.student_name
@@ -433,13 +441,16 @@ function App() {
 
   function markAttendance(record) {
     const classRow = data.classes.find((item) => Number(item.id) === Number(record.class_id))
+    const batch = data.batches?.find((item) => Number(item.id) === Number(record.batch_id))
     addRecord('attendance', {
       ...record,
       student_name: data.students.find((student) => Number(student.id) === Number(record.student_id))?.name || 'Student',
-      course_name: classRow?.course_name || 'Class',
-      branch_name: classRow?.branch_name,
+      course_name: batch?.course_name || classRow?.course_name || 'Class',
+      branch_name: batch?.branch_name || classRow?.branch_name,
+      batch_name: batch?.batch_name,
+      batch_type: batch?.batch_type,
       day_of_week: record.day_of_week || classRow?.day_of_week || new Date(record.date).toLocaleDateString('en-US', { weekday: 'long' }),
-      attendance_time: record.attendance_time || classRow?.start_time || new Date().toTimeString().slice(0, 5),
+      attendance_time: record.attendance_time || batch?.start_time || classRow?.start_time || new Date().toTimeString().slice(0, 5),
     })
   }
 
