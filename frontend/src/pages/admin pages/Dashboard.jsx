@@ -1000,8 +1000,8 @@ function PrintReportsView({ data, optionSets }) {
   }
 
   return (
-    <div className="dashboard-grid">
-      <section className="panel form-grid report-back-panel">
+    <div className="report-page-stack">
+      <section className="panel report-back-panel">
         <div className="form-title-row">
           <div>
             <span className="eyebrow">Print Reports</span>
@@ -1011,8 +1011,13 @@ function PrintReportsView({ data, optionSets }) {
         </div>
       </section>
       {activeReport === 'grade' && (
-      <section className="panel form-grid">
-        <h3>Grade Exam Print / PDF</h3>
+      <section className="panel form-grid report-form-panel">
+        <div className="form-title-row">
+          <div>
+            <span className="eyebrow">Report form</span>
+            <h3>Grade Exam Print / PDF</h3>
+          </div>
+        </div>
         <label className="field-control">
           <span>Grade Exam</span>
           <select value={gradeExamId} onChange={(event) => setGradeExamId(event.target.value)}>
@@ -1046,8 +1051,13 @@ function PrintReportsView({ data, optionSets }) {
       </section>
       )}
       {activeReport === 'program' && (
-      <section className="panel form-grid">
-        <h3>Program Details Print / PDF</h3>
+      <section className="panel form-grid report-form-panel">
+        <div className="form-title-row">
+          <div>
+            <span className="eyebrow">Report form</span>
+            <h3>Program Details Print / PDF</h3>
+          </div>
+        </div>
         <label className="field-control">
           <span>Program</span>
           <select value={eventProgramId} onChange={(event) => setEventProgramId(event.target.value)}>
@@ -1090,9 +1100,15 @@ function PrintReportsView({ data, optionSets }) {
         <p className="hint">{programItems.length} songs/items and {programParticipants.length} students found for this selection.</p>
       </section>
       )}
-      {activeReport === 'program' && <DataSection compact title="Program Student Preview" rows={programParticipants} columns={selectedColumns('participants').map((column) => column.key)} />}
-      {activeReport === 'program' && <DataSection compact title="Program Song Preview" rows={programItems} columns={selectedColumns('items').map((column) => column.key)} />}
-      {activeReport === 'grade' && <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />}
+      <section className="report-preview-stack">
+        <div>
+          <span className="eyebrow">Preview</span>
+          <h3>Selected Details</h3>
+        </div>
+        {activeReport === 'program' && <DataSection compact title="Program Student Preview" rows={programParticipants} columns={selectedColumns('participants').map((column) => column.key)} />}
+        {activeReport === 'program' && <DataSection compact title="Program Song Preview" rows={programItems} columns={selectedColumns('items').map((column) => column.key)} />}
+        {activeReport === 'grade' && <DataSection compact title="Grade Exam Preview" rows={gradeRows} columns={['student_name', 'parent_name', 'phone', 'branch_name', 'program_name', 'grade_name', 'marks', 'result_grade', 'result_status']} />}
+      </section>
     </div>
   )
 }

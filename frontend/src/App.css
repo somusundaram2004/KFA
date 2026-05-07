@@ -2120,6 +2120,32 @@ select {
   grid-column: 1 / -1;
 }
 
+.report-page-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.report-form-panel {
+  width: 100%;
+}
+
+.report-form-panel > .form-title-row {
+  grid-column: 1 / -1;
+}
+
+.report-preview-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.report-preview-stack > div:first-child {
+  padding: 0 4px;
+}
+
+.report-preview-stack h3 {
+  margin-bottom: 0;
+}
+
 .report-column-picker {
   grid-column: 1 / -1;
   display: grid;
